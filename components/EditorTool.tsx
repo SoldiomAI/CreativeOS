@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { ImageFile } from '../types';
-import { fileToBase64, editImage, generateImage, generateVideo } from '../services/geminiService';
+import { fileToBase64, editImage, generateImage } from '../services/geminiService';
+import { generateAnyVideo } from '../services/videoEngine';
 import Spinner from './Spinner';
 import LoadingOverlay from './LoadingOverlay';
 
@@ -190,26 +191,23 @@ const EditorTool: React.FC<EditorToolProps> = ({ onBack }) => {
       setError('Please enter a prompt for the video.');
       return;
     }
-    if (!sourceImage) {
-      setError('Please upload or generate an image first.');
-      return;
-    }
-    
+
     setIsLoading(true);
     setError(null);
     setVideoUrl(null);
     setHasApiKey(true);
 
     try {
-      const generatedVideoUrl = await generateVideo(sourceImage, prompt, setLoadingMessage);
-      setVideoUrl(generatedVideoUrl);
+      const images = sourceImage ? [sourceImage] : [];
+      const { url } = await generateAnyVideo(
+        { prompt, images, provider: 'auto' },
+        setLoadingMessage
+      );
+      setVideoUrl(url);
     } catch (e: any) {
-      if (e.message === 'API_KEY_REQUIRED') {
+      if (e.message === 'API_KEY_REQUIRED' || e.message === 'API_KEY_INVALID') {
         setHasApiKey(false);
-        setError('An API Key is required for video generation.');
-      } else if (e.message === 'API_KEY_INVALID') {
-        setHasApiKey(false);
-        setError('The selected API Key is invalid or missing permissions.');
+        setError('Paid Veo key missing — free HF/local sources also failed. Check the Factory Studio for provider options.');
       } else {
         setError(e.message || 'An unexpected error occurred during video generation.');
       }
@@ -251,7 +249,7 @@ const EditorTool: React.FC<EditorToolProps> = ({ onBack }) => {
   };
   
   const isSubmitDisabled = isLoading || !prompt || (activeTab === EditorTab.EDIT && !sourceImage);
-  const isVideoDisabled = isLoading || !prompt || !sourceImage;
+  const isVideoDisabled = isLoading || !prompt;
 
   return (
     <div className="w-full max-w-4xl mx-auto flex flex-col h-full justify-center text-center p-4 md:p-8 animate-fade-in-fast">

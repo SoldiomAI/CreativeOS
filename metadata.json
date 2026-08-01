@@ -1,5 +1,5 @@
 {
   "name": "Performance Creative OS",
-  "description": "The operating system for short-form video creation. Ideate, produce, test, and scale hits automatically.",
+  "description": "Create any short-form video from a prompt and images using free Hugging Face / GitHub open models, with local and Veo fallbacks.",
   "requestFramePermissions": []
 }

@@ -40,8 +40,35 @@ export default function App() {
                 </div>
             )}
             {activeTab === AppTab.SETTINGS && (
-                <div className="flex items-center justify-center h-full text-gray-500 font-mono text-sm">
-                    Optimization Matrix: Calibrating...
+                <div className="max-w-lg mx-auto h-full flex flex-col justify-center gap-4 p-4">
+                    <h2 className="text-2xl font-bold text-white">Connections</h2>
+                    <p className="text-gray-400 text-sm">
+                      Paste a free Hugging Face token to unlock ZeroGPU Spaces and Inference Providers.
+                      Get one at{' '}
+                      <a
+                        href="https://huggingface.co/settings/tokens"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-cyan-400 underline"
+                      >
+                        huggingface.co/settings/tokens
+                      </a>
+                      .
+                    </p>
+                    <input
+                      type="password"
+                      defaultValue={(() => {
+                        try { return localStorage.getItem('creativeos_hf_token') || ''; } catch { return ''; }
+                      })()}
+                      onChange={(e) => {
+                        try { localStorage.setItem('creativeos_hf_token', e.target.value.trim()); } catch { /* ignore */ }
+                      }}
+                      placeholder="hf_..."
+                      className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white outline-none focus:border-cyan-500"
+                    />
+                    <p className="text-xs text-gray-500 font-mono">
+                      Gemini / Veo still uses GEMINI_API_KEY from .env.local when selected.
+                    </p>
                 </div>
             )}
          </div>

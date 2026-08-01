@@ -6,6 +6,29 @@ export interface ImageFile {
   url: string;
 }
 
+export type VideoProvider =
+  | 'auto'
+  | 'ltx'
+  | 'animatediff'
+  | 'cogvideox'
+  | 'wan-space'
+  | 'hf-inference'
+  | 'local'
+  | 'veo';
+
+export type HfVideoModel =
+  | 'ltx'
+  | 'animatediff'
+  | 'cogvideox'
+  | 'wan-space'
+  | 'hf-inference';
+
+export interface VideoGenerationRequest {
+  prompt: string;
+  images?: ImageFile[];
+  provider?: VideoProvider;
+}
+
 export enum AppTab {
   DASHBOARD = 'DASHBOARD',
   STUDIO = 'STUDIO',

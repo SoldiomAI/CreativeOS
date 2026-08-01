@@ -21,8 +21,9 @@ const Dashboard: React.FC = () => {
             <p className="text-gray-400 text-sm">System Status: <span className="text-green-400">OPTIMIZED</span></p>
         </div>
         <div className="flex space-x-2">
-            <span className="px-3 py-1 rounded-full bg-blue-900/30 text-blue-400 border border-blue-800 text-xs font-mono">VEO-3.1: ACTIVE</span>
-            <span className="px-3 py-1 rounded-full bg-purple-900/30 text-purple-400 border border-purple-800 text-xs font-mono">FLASH-2.5: ACTIVE</span>
+            <span className="px-3 py-1 rounded-full bg-emerald-900/30 text-emerald-400 border border-emerald-800 text-xs font-mono">HF FREE: READY</span>
+            <span className="px-3 py-1 rounded-full bg-blue-900/30 text-blue-400 border border-blue-800 text-xs font-mono">LTX / WAN / LOCAL</span>
+            <span className="px-3 py-1 rounded-full bg-purple-900/30 text-purple-400 border border-purple-800 text-xs font-mono">VEO: OPTIONAL</span>
         </div>
       </div>
 
