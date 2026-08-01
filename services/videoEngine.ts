@@ -111,9 +111,10 @@ export const generateAnyVideo = async (
     return { url, providerUsed: provider };
   }
 
+  // Prefer Spaces known to be healthy; always end with offline local compositor.
   const chain: Exclude<VideoProvider, 'auto'>[] = images.length
-    ? ['ltx', 'local', 'animatediff']
-    : ['ltx', 'animatediff', 'cogvideox', 'wan-space', 'local'];
+    ? ['ltx', 'local']
+    : ['ltx', 'cogvideox', 'wan-space', 'local'];
 
   const errors: string[] = [];
   for (const candidate of chain) {

@@ -133,10 +133,11 @@ export const generateWithAnimateDiffSpace = async (
   setLoadingMessage('Connecting to AnimateDiff-Lightning (HF Space)…');
   const client = await connectSpace('ByteDance/AnimateDiff-Lightning');
   setLoadingMessage('Rendering AnimateDiff clip (free HF Space)…');
+  // Space occasionally errors server-side; keep defaults that match the published API.
   const result = await client.predict('/generate_image', {
     prompt,
-    base: 'epiCRealism',
-    motion: 'guoyww/animatediff-motion-lora-zoom-in',
+    base: 'ToonYou',
+    motion: '',
     step: '4',
   });
   const url = extractVideoUrl(result.data);
