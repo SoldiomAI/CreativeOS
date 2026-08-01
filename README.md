@@ -29,7 +29,8 @@ View the original AI Studio shell: https://ai.studio/apps/drive/1tuNPhOa8D1Xc0RS
    - `GEMINI_API_KEY` — concepts, Imagen stills, Veo
    - `HF_TOKEN` — free Hugging Face token for Spaces / Inference Providers
 3. Run the app:
-   `npm run dev`
+   `npm run dev`  
+   Open **http://localhost:5173/** (not `:3000`, which is reserved for Antigravity).
 
 You can also paste an HF token in **Optimization / Connections** inside the app (stored in `localStorage` only).
 
