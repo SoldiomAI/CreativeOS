@@ -29,7 +29,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
                 <span className="text-white font-bold text-lg">P</span>
              </div>
-             <span className="ml-3 font-bold text-white text-lg hidden md:block tracking-tight">Perf. OS</span>
+             <span className="ml-3 font-bold text-white text-lg hidden md:block tracking-tight">Creative OS</span>
         </div>
         
         <nav className="mt-6 px-2 md:px-4 space-y-2">

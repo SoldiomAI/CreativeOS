@@ -1,19 +1,23 @@
+export type MuxAudioClip = {
+  blob: Blob;
+  kind: 'music' | 'voice';
+};
+
 /**
- * Mux one or more audio blobs onto a video clip by re-recording
- * a playing <video> plus Web Audio tracks into a new WebM with sound.
+ * Mux audio clips onto a video by re-recording a playing <video>
+ * plus Web Audio into a new WebM with sound.
  */
 export const muxVideoWithAudio = async (
   videoUrl: string,
-  audioBlobs: Blob[],
+  clips: MuxAudioClip[],
   setLoadingMessage: (m: string) => void,
   options?: {
     musicGain?: number;
     voiceGain?: number;
-    /** Keep soundtrack already present on the source video (e.g. local movie). */
     keepOriginalAudio?: boolean;
   }
 ): Promise<string> => {
-  if (!audioBlobs.length && !options?.keepOriginalAudio) return videoUrl;
+  if (!clips.length && !options?.keepOriginalAudio) return videoUrl;
 
   setLoadingMessage('Mixing soundtrack into movie…');
 
@@ -21,8 +25,8 @@ export const muxVideoWithAudio = async (
   video.src = videoUrl;
   video.crossOrigin = 'anonymous';
   video.playsInline = true;
-  // Always route through Web Audio when keeping original, otherwise mute element output.
   video.muted = !options?.keepOriginalAudio;
+
   await new Promise<void>((resolve, reject) => {
     video.onloadedmetadata = () => resolve();
     video.onerror = () => reject(new Error('Failed to load video for audio mux'));
@@ -37,6 +41,7 @@ export const muxVideoWithAudio = async (
 
   const musicGain = options?.musicGain ?? 0.55;
   const voiceGain = options?.voiceGain ?? 1;
+  let decodedCount = 0;
 
   if (options?.keepOriginalAudio) {
     try {
@@ -46,28 +51,33 @@ export const muxVideoWithAudio = async (
       gain.gain.value = 0.85;
       elementSource.connect(gain);
       gain.connect(master);
+      decodedCount += 1;
     } catch (err) {
       console.warn('Could not tap original video audio', err);
       video.muted = true;
     }
   }
 
-  for (let i = 0; i < audioBlobs.length; i++) {
-    const blob = audioBlobs[i];
+  for (const clip of clips) {
     try {
-      const arrayBuffer = await blob.arrayBuffer();
+      const arrayBuffer = await clip.blob.arrayBuffer();
       const buffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
       const source = audioCtx.createBufferSource();
       source.buffer = buffer;
       const gain = audioCtx.createGain();
-      const isMusicBed = i === 0 && audioBlobs.length > 1 && !options?.keepOriginalAudio;
-      gain.gain.value = isMusicBed ? musicGain : voiceGain;
+      gain.gain.value = clip.kind === 'music' ? musicGain : voiceGain;
       source.connect(gain);
       gain.connect(master);
-      source.start(audioCtx.currentTime + (i === 0 && !options?.keepOriginalAudio ? 0 : 0.12));
+      source.start(audioCtx.currentTime + (clip.kind === 'voice' ? 0.12 : 0));
+      decodedCount += 1;
     } catch (err) {
-      console.warn('Skipping undecodable audio blob', err);
+      console.warn(`Skipping undecodable ${clip.kind} audio`, err);
     }
+  }
+
+  if (decodedCount === 0) {
+    await audioCtx.close();
+    throw new Error('No decodable audio to mux');
   }
 
   const capture = (video as HTMLVideoElement & { captureStream(): MediaStream }).captureStream();
@@ -89,17 +99,17 @@ export const muxVideoWithAudio = async (
     throw new Error('Browser cannot record video+audio WebM');
   }
 
+  const chunks: BlobPart[] = [];
   const recorder = new MediaRecorder(combined, {
     mimeType,
     videoBitsPerSecond: 4_000_000,
     audioBitsPerSecond: 192_000,
   });
-  const chunks: BlobPart[] = [];
   recorder.ondataavailable = (e) => {
     if (e.data.size > 0) chunks.push(e.data);
   };
 
-  const done = new Promise<string>((resolve, reject) => {
+  const stopped = new Promise<string>((resolve, reject) => {
     recorder.onerror = () => reject(new Error('Audio mux recording failed'));
     recorder.onstop = () => {
       const blob = new Blob(chunks, { type: mimeType });
@@ -112,25 +122,28 @@ export const muxVideoWithAudio = async (
   try {
     await video.play();
   } catch {
-    // Autoplay policies — still attempt timed recording
+    /* timed recording still proceeds */
   }
 
   await new Promise<void>((resolve) => {
-    const timeout = window.setTimeout(() => resolve(), (duration + 0.35) * 1000);
+    const timeout = window.setTimeout(() => resolve(), (duration + 0.4) * 1000);
     video.onended = () => {
       window.clearTimeout(timeout);
       resolve();
     };
   });
 
+  // Stop recorder first and wait for onstop before tearing down tracks/context.
   if (recorder.state !== 'inactive') recorder.stop();
+  const resultUrl = await stopped;
+
   video.pause();
   capture.getTracks().forEach((t) => t.stop());
   dest.stream.getTracks().forEach((t) => t.stop());
   await audioCtx.close();
 
   setLoadingMessage('Soundtrack mix complete');
-  return done;
+  return resultUrl;
 };
 
 export const estimateVideoDuration = async (videoUrl: string, fallbackSec = 6): Promise<number> => {

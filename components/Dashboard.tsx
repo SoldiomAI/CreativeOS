@@ -17,8 +17,8 @@ const Dashboard: React.FC = () => {
     <div className="h-full flex flex-col gap-6 overflow-y-auto p-1">
       <div className="flex justify-between items-center mb-2">
         <div>
-            <h2 className="text-2xl font-bold text-white tracking-tight">Audit Report</h2>
-            <p className="text-gray-400 text-sm">System Status: <span className="text-green-400">OPTIMIZED</span></p>
+            <h2 className="text-2xl font-bold text-white tracking-tight">Command Center</h2>
+            <p className="text-gray-400 text-sm">Prompt → Movie pipeline: <span className="text-green-400">READY on :5173</span></p>
         </div>
         <div className="flex space-x-2">
             <span className="px-3 py-1 rounded-full bg-emerald-900/30 text-emerald-400 border border-emerald-800 text-xs font-mono">HF FREE: READY</span>

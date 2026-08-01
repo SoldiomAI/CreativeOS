@@ -200,7 +200,7 @@ const EditorTool: React.FC<EditorToolProps> = ({ onBack }) => {
     try {
       const images = sourceImage ? [sourceImage] : [];
       const { url } = await generateAnyVideo(
-        { prompt, images, provider: 'auto', soundtrack: true, voiceover: true },
+        { prompt, images, provider: 'local', soundtrack: true, voiceover: true },
         setLoadingMessage
       );
       setVideoUrl(url);

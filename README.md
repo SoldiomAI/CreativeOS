@@ -25,14 +25,18 @@ View the original AI Studio shell: https://ai.studio/apps/drive/1tuNPhOa8D1Xc0RS
 
 1. Install dependencies:
    `npm install`
-2. Optional keys in [`.env.local`](.env.local):
-   - `GEMINI_API_KEY` — concepts, Imagen stills, Veo
-   - `HF_TOKEN` — free Hugging Face token for Spaces / Inference Providers
+2. Optional `GEMINI_API_KEY` in [`.env.local`](.env.local) for concepts, Imagen stills, and Veo.
 3. Run the app:
    `npm run dev`  
    Open **http://localhost:5173/** (not `:3000`, which is reserved for Antigravity).
+4. Paste a free HF token in **Optimization / Connections** (browser `localStorage` only — not bundled).
 
-You can also paste an HF token in **Optimization / Connections** inside the app (stored in `localStorage` only).
+## Quality checks
+
+```bash
+npm run typecheck
+npm run build
+```
 
 ## Factory Studio
 

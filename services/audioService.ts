@@ -1,5 +1,8 @@
 import { Client } from '@gradio/client';
 import { getStoredHfToken } from './hfVideoService';
+import { withTimeout } from './utils';
+
+const SPACE_TIMEOUT_MS = 120_000;
 
 export type AudioMood = 'cinematic' | 'upbeat' | 'dark' | 'dreamy' | 'tech';
 
@@ -66,15 +69,31 @@ export const generateMusicWithHf = async (
   const client = await connectSpace('sanchit-gandhi/musicgen-streaming');
   // Space enforces a minimum length of 10 seconds.
   const length = Math.max(10, Math.min(20, Math.ceil(durationSec + 1)));
-  const result = await client.predict('/generate_audio', {
-    text_prompt: musicPromptFor(prompt, mood),
-    audio_length_in_s: length,
-    play_steps_in_s: 1.5,
-    seed: Math.floor(Math.random() * 1000),
-  });
+  const result = await withTimeout(
+    client.predict('/generate_audio', {
+      text_prompt: musicPromptFor(prompt, mood),
+      audio_length_in_s: length,
+      play_steps_in_s: 1.5,
+      seed: Math.floor(Math.random() * 1000),
+    }),
+    SPACE_TIMEOUT_MS,
+    'MusicGen'
+  );
   const url = extractAudioUrl(result.data);
   if (!url) throw new Error('MusicGen returned no audio');
-  return fetchAudioBlob(url);
+  const blob = await fetchAudioBlob(url);
+  // Ensure the browser can decode before we claim success.
+  await assertDecodable(blob);
+  return blob;
+};
+
+const assertDecodable = async (blob: Blob): Promise<void> => {
+  const ctx = new OfflineAudioContext(1, 1, 44100);
+  try {
+    await ctx.decodeAudioData((await blob.arrayBuffer()).slice(0));
+  } catch {
+    throw new Error('Audio blob is not decodable in this browser');
+  }
 };
 
 /** Download direct audio or stitch HLS (m3u8) AAC segments from Gradio Spaces. */
@@ -126,15 +145,21 @@ export const generateVoiceoverWithHf = async (
 ): Promise<Blob> => {
   setLoadingMessage('Recording voiceover with Edge-TTS (HF Space)…');
   const client = await connectSpace('innoai/Edge-TTS-Text-to-Speech');
-  const result = await client.predict('/tts_interface', {
-    text: narration.slice(0, 280),
-    voice: 'en-US-JennyNeural - en-US (Female)',
-    rate: 0,
-    pitch: 0,
-  });
+  const result = await withTimeout(
+    client.predict('/tts_interface', {
+      text: narration.slice(0, 280),
+      voice: 'en-US-JennyNeural - en-US (Female)',
+      rate: 0,
+      pitch: 0,
+    }),
+    SPACE_TIMEOUT_MS,
+    'Edge-TTS'
+  );
   const url = extractAudioUrl(result.data);
   if (!url) throw new Error('Edge-TTS returned no audio');
-  return fetchAudioBlob(url);
+  const blob = await fetchAudioBlob(url);
+  await assertDecodable(blob);
+  return blob;
 };
 
 /**
@@ -265,31 +290,35 @@ export const buildNarrationText = (prompt: string): string => {
   return `${cleaned.slice(0, 157).trim()}…`;
 };
 
+export type MovieAudioTrack = { blob: Blob; kind: 'music' | 'voice' };
+
 export const generateMovieAudio = async (
   prompt: string,
   durationSec: number,
   options: { soundtrack: boolean; voiceover: boolean },
   setLoadingMessage: (m: string) => void
-): Promise<{ music?: Blob; voice?: Blob }> => {
-  const out: { music?: Blob; voice?: Blob } = {};
+): Promise<MovieAudioTrack[]> => {
+  const tracks: MovieAudioTrack[] = [];
 
   if (options.soundtrack) {
-    // Always have a local score ready; upgrade to MusicGen when the Space cooperates.
     try {
-      out.music = await generateMusicWithHf(prompt, durationSec, setLoadingMessage);
+      const music = await generateMusicWithHf(prompt, durationSec, setLoadingMessage);
+      tracks.push({ blob: music, kind: 'music' });
     } catch (e) {
       console.warn('MusicGen unavailable, using local score', e);
-      out.music = await generateLocalSoundtrack(prompt, durationSec, setLoadingMessage);
+      const music = await generateLocalSoundtrack(prompt, durationSec, setLoadingMessage);
+      tracks.push({ blob: music, kind: 'music' });
     }
   }
 
   if (options.voiceover) {
     try {
-      out.voice = await generateVoiceoverWithHf(buildNarrationText(prompt), setLoadingMessage);
+      const voice = await generateVoiceoverWithHf(buildNarrationText(prompt), setLoadingMessage);
+      tracks.push({ blob: voice, kind: 'voice' });
     } catch {
       setLoadingMessage('Voiceover Space busy — continuing with soundtrack only…');
     }
   }
 
-  return out;
+  return tracks;
 };

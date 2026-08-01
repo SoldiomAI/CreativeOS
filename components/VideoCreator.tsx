@@ -3,12 +3,18 @@ import { ImageFile, VideoProvider } from '../types';
 import { fileToBase64, generateImage } from '../services/geminiService';
 import { generateAnyVideo, VIDEO_PROVIDERS } from '../services/videoEngine';
 import { getStoredHfToken, setStoredHfToken } from '../services/hfVideoService';
+import { revokeObjectUrl, safeErrorMessage } from '../services/utils';
 import Spinner from './Spinner';
 import LoadingOverlay from './LoadingOverlay';
 
 interface VideoCreatorProps {
   initialPrompt?: string;
-  onComplete: (videoUrl: string, prompt: string, providerUsed: VideoProvider) => void;
+  onComplete: (
+    videoUrl: string,
+    prompt: string,
+    providerUsed: VideoProvider,
+    hasAudio: boolean
+  ) => void;
 }
 
 const VideoCreator: React.FC<VideoCreatorProps> = ({ initialPrompt = '', onComplete }) => {
@@ -84,13 +90,13 @@ const VideoCreator: React.FC<VideoCreatorProps> = ({ initialPrompt = '', onCompl
     setIsLoading(true);
     setError(null);
     try {
-      const { url, providerUsed } = await generateAnyVideo(
+      const { url, providerUsed, hasAudio } = await generateAnyVideo(
         { prompt, images, provider, soundtrack, voiceover },
         setLoadingMessage
       );
-      onComplete(url, prompt, providerUsed);
-    } catch (e: any) {
-      const message = e?.message || 'Video generation failed';
+      onComplete(url, prompt, providerUsed, hasAudio);
+    } catch (e: unknown) {
+      const message = safeErrorMessage(e, 'Video generation failed');
       if (message.includes('HF_TOKEN_REQUIRED')) {
         setShowToken(true);
         setError('This provider needs a free Hugging Face token. Paste it below, then retry.');
@@ -258,7 +264,13 @@ const VideoCreator: React.FC<VideoCreatorProps> = ({ initialPrompt = '', onCompl
                 <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
                 <button
                   type="button"
-                  onClick={() => setImages((prev) => prev.filter((_, i) => i !== idx))}
+                  onClick={() =>
+                    setImages((prev) => {
+                      const target = prev[idx];
+                      revokeObjectUrl(target?.url);
+                      return prev.filter((_, i) => i !== idx);
+                    })
+                  }
                   className="absolute top-1 right-1 bg-black/70 text-white text-xs px-2 py-0.5 rounded"
                 >
                   Remove

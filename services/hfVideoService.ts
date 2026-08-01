@@ -1,6 +1,9 @@
 import { Client } from '@gradio/client';
 import { InferenceClient } from '@huggingface/inference';
 import { ImageFile, HfVideoModel } from '../types';
+import { withTimeout } from './utils';
+
+const SPACE_TIMEOUT_MS = 180_000;
 
 const DEFAULT_NEGATIVE =
   'worst quality, inconsistent motion, blurry, jittery, distorted, watermark, text overlay';
@@ -103,21 +106,25 @@ export const generateWithLtxSpace = async (
       : 'Generating video with LTX-Video (free HF Space)…'
   );
 
-  const result = await client.predict(hasImage ? '/image_to_video' : '/text_to_video', {
-    prompt,
-    negative_prompt: DEFAULT_NEGATIVE,
-    input_image_filepath: hasImage ? toGradioImage(images[0]) : null,
-    input_video_filepath: null,
-    height_ui: 768,
-    width_ui: 512,
-    mode: hasImage ? 'image-to-video' : 'text-to-video',
-    duration_ui: 3,
-    ui_frames_to_use: 9,
-    seed_ui: Math.floor(Math.random() * 1_000_000),
-    randomize_seed: true,
-    ui_guidance_scale: 1,
-    improve_texture_flag: true,
-  });
+  const result = await withTimeout(
+    client.predict(hasImage ? '/image_to_video' : '/text_to_video', {
+      prompt,
+      negative_prompt: DEFAULT_NEGATIVE,
+      input_image_filepath: hasImage ? toGradioImage(images[0]) : null,
+      input_video_filepath: null,
+      height_ui: 768,
+      width_ui: 512,
+      mode: hasImage ? 'image-to-video' : 'text-to-video',
+      duration_ui: 3,
+      ui_frames_to_use: 9,
+      seed_ui: Math.floor(Math.random() * 1_000_000),
+      randomize_seed: true,
+      ui_guidance_scale: 1,
+      improve_texture_flag: true,
+    }),
+    SPACE_TIMEOUT_MS,
+    'LTX-Video'
+  );
 
   const url = extractVideoUrl(result.data);
   if (!url) throw new Error('LTX Space returned no video');
@@ -134,12 +141,16 @@ export const generateWithAnimateDiffSpace = async (
   const client = await connectSpace('ByteDance/AnimateDiff-Lightning');
   setLoadingMessage('Rendering AnimateDiff clip (free HF Space)…');
   // Space occasionally errors server-side; keep defaults that match the published API.
-  const result = await client.predict('/generate_image', {
-    prompt,
-    base: 'ToonYou',
-    motion: '',
-    step: '4',
-  });
+  const result = await withTimeout(
+    client.predict('/generate_image', {
+      prompt,
+      base: 'ToonYou',
+      motion: '',
+      step: '4',
+    }),
+    SPACE_TIMEOUT_MS,
+    'AnimateDiff'
+  );
   const url = extractVideoUrl(result.data);
   if (!url) throw new Error('AnimateDiff Space returned no video');
   setLoadingMessage('Downloading AnimateDiff video…');
@@ -154,11 +165,15 @@ export const generateWithCogVideoSpace = async (
   setLoadingMessage('Connecting to CogVideoX-2B (HF Space)…');
   const client = await connectSpace('zai-org/CogVideoX-2B-Space');
   setLoadingMessage('Generating with CogVideoX-2B (free HF Space)…');
-  const result = await client.predict('/generate', {
-    prompt,
-    num_inference_steps: 30,
-    guidance_scale: 6,
-  });
+  const result = await withTimeout(
+    client.predict('/generate', {
+      prompt,
+      num_inference_steps: 30,
+      guidance_scale: 6,
+    }),
+    SPACE_TIMEOUT_MS,
+    'CogVideoX'
+  );
   const url = extractVideoUrl(result.data);
   if (!url) throw new Error('CogVideoX Space returned no video');
   setLoadingMessage('Downloading CogVideoX video…');
@@ -173,7 +188,11 @@ export const generateWithWanSpace = async (
   setLoadingMessage('Connecting to Wan2.1 Space…');
   const client = await connectSpace('fffiloni/Wan2.1');
   setLoadingMessage('Generating with Wan2.1 (free HF Space)…');
-  const result = await client.predict('/infer', { prompt });
+  const result = await withTimeout(
+    client.predict('/infer', { prompt }),
+    SPACE_TIMEOUT_MS,
+    'Wan2.1'
+  );
   const url = extractVideoUrl(result.data);
   if (!url) throw new Error('Wan Space returned no video');
   setLoadingMessage('Downloading Wan video…');

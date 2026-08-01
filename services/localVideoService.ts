@@ -159,7 +159,7 @@ export const generateLocalVideo = async (
     if (e.data.size > 0) chunks.push(e.data);
   };
 
-  const done = new Promise<string>((resolve, reject) => {
+  const stopped = new Promise<string>((resolve, reject) => {
     recorder.onerror = () => reject(new Error('Local video recording failed'));
     recorder.onstop = () => {
       const blob = new Blob(chunks, { type: mimeType });
@@ -168,6 +168,8 @@ export const generateLocalVideo = async (
   });
 
   recorder.start(100);
+  const frameDurationMs = 1000 / fps;
+  const startedAt = performance.now();
 
   for (let i = 0; i < totalFrames; i++) {
     const clipIndex = Math.min(frames.length - 1, Math.floor(i / framesPerClip));
@@ -232,12 +234,15 @@ export const generateLocalVideo = async (
       setLoadingMessage(`Rendering local movie… ${Math.round((i / totalFrames) * 100)}%`);
     }
 
-    await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+    const target = startedAt + (i + 1) * frameDurationMs;
+    const delay = Math.max(0, target - performance.now());
+    await new Promise((r) => setTimeout(r, delay));
   }
 
   setLoadingMessage('Finalizing local movie…');
-  recorder.stop();
+  if (recorder.state !== 'inactive') recorder.stop();
+  const resultUrl = await stopped;
   videoStream.getTracks().forEach((t) => t.stop());
   await score?.stop();
-  return done;
+  return resultUrl;
 };

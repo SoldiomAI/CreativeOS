@@ -1,7 +1,31 @@
 import { GoogleGenAI, Modality, GenerateVideosOperation, Type } from "@google/genai";
 import { ImageFile, CreativeConcept, SocialCampaign } from '../types';
+import { safeErrorMessage } from './utils';
 
-// Helper to convert file to base64
+const getGeminiKey = (): string | undefined => {
+  const key = (process.env.API_KEY || process.env.GEMINI_API_KEY || '').trim();
+  return key || undefined;
+};
+
+const requireGeminiKey = (): string => {
+  const key = getGeminiKey();
+  if (!key) {
+    throw new Error('GEMINI_API_KEY missing. Set it in .env.local or use free HF/local movie providers.');
+  }
+  return key;
+};
+
+/** AI Studio exposes window.aistudio; local Vite does not. */
+const hasAiStudioKeySelected = async (): Promise<boolean | 'unavailable'> => {
+  const studio = (window as unknown as { aistudio?: { hasSelectedApiKey?: () => Promise<boolean> } }).aistudio;
+  if (!studio?.hasSelectedApiKey) return 'unavailable';
+  try {
+    return await studio.hasSelectedApiKey();
+  } catch {
+    return false;
+  }
+};
+
 export const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -12,11 +36,11 @@ export const fileToBase64 = (file: File): Promise<string> => {
 };
 
 export const generateCreativeConcepts = async (topic: string): Promise<CreativeConcept[]> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: requireGeminiKey() });
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
     contents: `Generate 3 viral short-form video concepts for the topic: "${topic}". 
-    Focus on high-retention hooks and visually striking imagery suitable for Veo generation.`,
+    Focus on high-retention hooks and visually striking imagery suitable for short-form video.`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
@@ -42,7 +66,7 @@ export const generateCreativeConcepts = async (topic: string): Promise<CreativeC
 };
 
 export const generateSocialMetadata = async (topic: string, hook: string, description: string): Promise<SocialCampaign> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: requireGeminiKey() });
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
     contents: `Generate viral social media metadata for a short video.
@@ -92,7 +116,7 @@ export const generateSocialMetadata = async (topic: string, hook: string, descri
 };
 
 export const editImage = async (imageFile: ImageFile, prompt: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: requireGeminiKey() });
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
     contents: {
@@ -113,9 +137,10 @@ export const editImage = async (imageFile: ImageFile, prompt: string): Promise<s
     },
   });
 
-  for (const part of response.candidates[0].content.parts) {
-    if (part.inlineData) {
-      return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+  const parts = response.candidates?.[0]?.content?.parts || [];
+  for (const part of parts) {
+    if (part.inlineData?.data) {
+      return `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
     }
   }
 
@@ -124,20 +149,20 @@ export const editImage = async (imageFile: ImageFile, prompt: string): Promise<s
 
 
 export const generateImage = async (prompt: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: requireGeminiKey() });
   const response = await ai.models.generateImages({
       model: 'imagen-4.0-generate-001',
       prompt: prompt,
       config: {
         numberOfImages: 1,
         outputMimeType: 'image/jpeg',
-        aspectRatio: '9:16', // Optimized for vertical video backgrounds
+        aspectRatio: '9:16',
       },
   });
 
-  if (response.generatedImages.length > 0) {
-    const base64ImageBytes: string = response.generatedImages[0].image.imageBytes;
-    return `data:image/jpeg;base64,${base64ImageBytes}`;
+  const image = response.generatedImages?.[0]?.image?.imageBytes;
+  if (image) {
+    return `data:image/jpeg;base64,${image}`;
   }
   
   throw new Error("No image generated");
@@ -150,15 +175,17 @@ export const generateVideo = async (
     setLoadingMessage: (message: string) => void
   ): Promise<string> => {
 
-  // VEO requires user-selected API Key
-  const hasApiKey = await (window as any).aistudio.hasSelectedApiKey();
-  if (!hasApiKey) {
+  const studioKey = await hasAiStudioKeySelected();
+  if (studioKey === false) {
     setLoadingMessage('API Key required for video generation.');
     throw new Error('API_KEY_REQUIRED');
   }
+  if (studioKey === 'unavailable' && !getGeminiKey()) {
+    setLoadingMessage('Gemini API key required for Veo.');
+    throw new Error('API_KEY_REQUIRED');
+  }
 
-  // Create a new instance right before the call
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: requireGeminiKey() });
   
   setLoadingMessage('Initializing Veo-3.1...');
   let operation: GenerateVideosOperation;
@@ -176,11 +203,12 @@ export const generateVideo = async (
         aspectRatio: '9:16'
       }
     });
-  } catch(e: any) {
-    if (e.message.includes('Requested entity was not found.')) {
+  } catch(e: unknown) {
+    const msg = safeErrorMessage(e);
+    if (msg.includes('Requested entity was not found.')) {
         throw new Error('API_KEY_INVALID');
     }
-    throw e;
+    throw e instanceof Error ? e : new Error(msg);
   }
 
   let i = 0;
@@ -201,15 +229,15 @@ export const generateVideo = async (
   }
 
   if (operation.error) {
-    throw new Error(`Video generation failed: ${operation.error.message}`);
+    throw new Error(`Video generation failed: ${operation.error.message || 'unknown error'}`);
   }
 
   setLoadingMessage('Transferring asset...');
 
-  if (operation.response?.generatedVideos?.[0]?.video?.uri) {
-    const downloadLink = operation.response.generatedVideos[0].video.uri;
-    // The response.body contains the MP4 bytes. You must append an API key when fetching from the download link.
-    const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+  const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
+  if (downloadLink) {
+    const key = getGeminiKey();
+    const response = await fetch(key ? `${downloadLink}&key=${key}` : downloadLink);
     
     if (!response.ok) {
         throw new Error(`Failed to download video: ${response.statusText}`);

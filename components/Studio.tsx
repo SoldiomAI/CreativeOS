@@ -1,28 +1,35 @@
 import React, { useState } from 'react';
 import { CreativeConcept, SocialCampaign, VideoProvider } from '../types';
 import { generateCreativeConcepts, generateSocialMetadata } from '../services/geminiService';
+import { addToLibrary } from '../services/libraryStore';
+import { revokeObjectUrl } from '../services/utils';
 import VideoCreator from './VideoCreator';
 import Spinner from './Spinner';
 
 type StudioMode = 'create' | 'ideate';
 
+const PLATFORM_STATUS_COLOR: Record<string, string> = {
+  youtube: 'text-red-400',
+  instagram: 'text-pink-400',
+  tiktok: 'text-cyan-400',
+};
+
 const Studio: React.FC = () => {
   const [mode, setMode] = useState<StudioMode>('create');
   const [step, setStep] = useState<'produce' | 'result' | 'distribute'>('produce');
 
-  // Ideation
   const [topic, setTopic] = useState('');
   const [concepts, setConcepts] = useState<CreativeConcept[]>([]);
   const [selectedConcept, setSelectedConcept] = useState<CreativeConcept | null>(null);
   const [isGeneratingConcepts, setIsGeneratingConcepts] = useState(false);
   const [seedPrompt, setSeedPrompt] = useState('');
 
-  // Result
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [usedPrompt, setUsedPrompt] = useState('');
   const [providerUsed, setProviderUsed] = useState<VideoProvider | null>(null);
+  const [hasAudio, setHasAudio] = useState(false);
+  const [savedNote, setSavedNote] = useState<string | null>(null);
 
-  // Distribution
   const [socialCampaign, setSocialCampaign] = useState<SocialCampaign | null>(null);
   const [isGeneratingSocial, setIsGeneratingSocial] = useState(false);
   const [scheduleDate, setScheduleDate] = useState(new Date().toISOString().split('T')[0]);
@@ -59,16 +66,31 @@ const Studio: React.FC = () => {
     setStep('produce');
   };
 
-  const handleVideoComplete = (url: string, prompt: string, used: VideoProvider) => {
+  const handleVideoComplete = async (
+    url: string,
+    prompt: string,
+    used: VideoProvider,
+    audio: boolean
+  ) => {
+    revokeObjectUrl(videoUrl);
     setVideoUrl(url);
     setUsedPrompt(prompt);
     setProviderUsed(used);
+    setHasAudio(audio);
     setStep('result');
+    setSavedNote(null);
+    try {
+      await addToLibrary(prompt, used, url, audio);
+      setSavedNote('Saved to Asset Library');
+    } catch {
+      setSavedNote('Created — library save skipped (storage full)');
+    }
   };
 
   const handleStartDistribution = async () => {
     setStep('distribute');
     setIsGeneratingSocial(true);
+    setError(null);
     try {
       const campaign = await generateSocialMetadata(
         topic || usedPrompt.slice(0, 80),
@@ -77,7 +99,12 @@ const Studio: React.FC = () => {
       );
       setSocialCampaign(campaign);
     } catch {
-      setError('Failed to generate social variants.');
+      setSocialCampaign({
+        youtube: { caption: usedPrompt, hashtags: ['shorts', 'ai'] },
+        instagram: { caption: usedPrompt, hashtags: ['reels', 'creative'] },
+        tiktok: { caption: usedPrompt, hashtags: ['fyp', 'ai'] },
+      });
+      setError('Could not AI-generate captions — using prompt fallbacks.');
     } finally {
       setIsGeneratingSocial(false);
     }
@@ -88,9 +115,9 @@ const Studio: React.FC = () => {
     const platforms = ['youtube', 'instagram', 'tiktok'];
     for (const platform of platforms) {
       setPlatformStatuses((prev) => ({ ...prev, [platform]: 'uploading' }));
-      await new Promise((resolve) => setTimeout(resolve, 1200));
+      await new Promise((resolve) => setTimeout(resolve, 900));
       setPlatformStatuses((prev) => ({ ...prev, [platform]: 'optimizing' }));
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      await new Promise((resolve) => setTimeout(resolve, 600));
       setPlatformStatuses((prev) => ({ ...prev, [platform]: 'done' }));
     }
     setIsPublishing(false);
@@ -98,11 +125,14 @@ const Studio: React.FC = () => {
   };
 
   const reset = () => {
+    revokeObjectUrl(videoUrl);
     setStep('produce');
     setMode('create');
     setVideoUrl(null);
     setUsedPrompt('');
     setProviderUsed(null);
+    setHasAudio(false);
+    setSavedNote(null);
     setConcepts([]);
     setTopic('');
     setSelectedConcept(null);
@@ -119,18 +149,22 @@ const Studio: React.FC = () => {
       <div className="h-full flex flex-col items-center justify-center animate-fade-in">
         <div className="max-w-md w-full bg-gray-800/50 border border-gray-700 rounded-2xl p-6 shadow-2xl">
           <h2 className="text-2xl font-bold text-white mb-2 text-center">Movie Ready</h2>
-          <p className="text-center text-xs font-mono text-cyan-400 mb-4">
+          <p className="text-center text-xs font-mono text-cyan-400 mb-1">
             Provider: {providerUsed || 'unknown'}
+            {hasAudio ? ' · with sound' : ''}
           </p>
+          {savedNote && (
+            <p className="text-center text-[11px] text-emerald-400 mb-3">{savedNote}</p>
+          )}
           <div className="aspect-[9/16] bg-black rounded-lg overflow-hidden mb-6 ring-4 ring-gray-700">
             <video src={videoUrl} controls autoPlay loop className="w-full h-full object-cover" />
           </div>
           <a
             href={videoUrl}
-            download="creativeos-video.webm"
+            download="creativeos-movie.webm"
             className="block text-center mb-4 text-sm text-cyan-400 hover:underline"
           >
-            Download video
+            Download movie
           </a>
           <div className="grid grid-cols-2 gap-4">
             <button
@@ -143,7 +177,7 @@ const Studio: React.FC = () => {
               onClick={handleStartDistribution}
               className="py-3 rounded-lg bg-green-600 hover:bg-green-500 text-white font-bold shadow-lg shadow-green-900/20"
             >
-              Distribute
+              Captions
             </button>
           </div>
         </div>
@@ -169,9 +203,12 @@ const Studio: React.FC = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-3xl font-bold text-white mb-2">Campaign Deployed</h2>
-          <p className="text-gray-400 mb-8">
-            Scheduled {scheduleDate} @ {scheduleTime}
+          <h2 className="text-3xl font-bold text-white mb-2">Demo Schedule Complete</h2>
+          <p className="text-gray-400 mb-2 text-sm">
+            Preview only — no real posts were published.
+          </p>
+          <p className="text-gray-500 mb-8 font-mono text-xs">
+            {scheduleDate} @ {scheduleTime}
           </p>
           <button
             onClick={reset}
@@ -185,12 +222,24 @@ const Studio: React.FC = () => {
 
     return (
       <div className="h-full flex flex-col animate-fade-in">
-        <div className="flex justify-between items-center mb-6 bg-gray-800/50 p-4 rounded-xl border border-gray-700">
-          <div>
-            <h2 className="text-xl font-bold text-white">Distribution Autopilot</h2>
-            <p className="text-gray-400 text-sm">Review metadata and schedule deployment.</p>
+        {error && (
+          <div className="mb-3 bg-amber-900/20 border border-amber-800 p-3 rounded text-amber-200 text-sm">
+            {error}
           </div>
-          <div className="flex items-center gap-4">
+        )}
+        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6 bg-gray-800/50 p-4 rounded-xl border border-gray-700">
+          <div>
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              Caption Studio
+              <span className="px-2 py-0.5 rounded bg-amber-900/40 text-amber-300 text-[10px] border border-amber-800">
+                DEMO PUBLISH
+              </span>
+            </h2>
+            <p className="text-gray-400 text-sm">
+              Edit captions locally. Launch simulates a schedule — it does not post.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2 bg-gray-900 px-3 py-2 rounded-lg border border-gray-700">
               <input
                 type="date"
@@ -210,7 +259,7 @@ const Studio: React.FC = () => {
               disabled={isPublishing}
               className="bg-green-600 hover:bg-green-500 disabled:bg-gray-600 text-white font-bold px-6 py-2 rounded-lg"
             >
-              {isPublishing ? 'Deploying…' : 'Launch Campaign'}
+              {isPublishing ? 'Simulating…' : 'Simulate Schedule'}
             </button>
           </div>
         </div>
@@ -218,11 +267,11 @@ const Studio: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pb-4">
           {(
             [
-              ['youtube', 'YouTube Shorts', 'red'],
-              ['instagram', 'Instagram Reels', 'pink'],
-              ['tiktok', 'TikTok', 'cyan'],
+              ['youtube', 'YouTube Shorts'],
+              ['instagram', 'Instagram Reels'],
+              ['tiktok', 'TikTok'],
             ] as const
-          ).map(([key, title, color]) => (
+          ).map(([key, title]) => (
             <div
               key={key}
               className="bg-gray-900 border border-gray-700 rounded-xl overflow-hidden flex flex-col relative"
@@ -230,9 +279,9 @@ const Studio: React.FC = () => {
               {platformStatuses[key] !== 'idle' && (
                 <div className="absolute inset-0 bg-black/80 z-10 flex flex-col items-center justify-center">
                   {platformStatuses[key] === 'done' ? (
-                    <div className="text-green-500">Scheduled</div>
+                    <div className="text-green-500">Demo scheduled</div>
                   ) : (
-                    <div className={`text-${color}-400 flex flex-col items-center`}>
+                    <div className={`${PLATFORM_STATUS_COLOR[key]} flex flex-col items-center`}>
                       <Spinner className="mb-2" />
                       {platformStatuses[key]}
                     </div>
@@ -244,11 +293,11 @@ const Studio: React.FC = () => {
               </div>
               <div className="p-4 space-y-3">
                 <textarea
-                  defaultValue={socialCampaign?.[key].caption}
+                  defaultValue={socialCampaign?.[key]?.caption || usedPrompt}
                   className="w-full h-28 bg-gray-800 border border-gray-700 rounded p-3 text-sm text-gray-300 outline-none resize-none"
                 />
                 <div className="flex flex-wrap gap-2">
-                  {socialCampaign?.[key].hashtags.map((tag, i) => (
+                  {(socialCampaign?.[key]?.hashtags || []).map((tag, i) => (
                     <span key={i} className="bg-gray-800 text-gray-300 text-xs px-2 py-1 rounded">
                       #{tag}
                     </span>
@@ -287,7 +336,7 @@ const Studio: React.FC = () => {
         </button>
       </div>
 
-      {error && (
+      {error && mode === 'ideate' && (
         <div className="bg-red-900/20 border border-red-800 p-3 rounded text-red-300 text-sm">
           {error}
         </div>
@@ -306,7 +355,7 @@ const Studio: React.FC = () => {
           <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
             <h2 className="text-xl font-bold text-white mb-2">Hook Foundry</h2>
             <p className="text-gray-400 text-sm mb-4">
-              Generate viral concepts, then send one into Create Video.
+              Generate viral concepts, then send one into Prompt → Movie.
             </p>
             <div className="flex gap-2">
               <input

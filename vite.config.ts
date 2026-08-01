@@ -18,10 +18,12 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [react()],
       define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.HF_TOKEN': JSON.stringify(env.HF_TOKEN || env.VITE_HF_TOKEN || ''),
-        'process.env.VITE_HF_TOKEN': JSON.stringify(env.HF_TOKEN || env.VITE_HF_TOKEN || ''),
+        // Gemini key for local AI Studio / Imagen / Veo. Prefer .env.local; never commit secrets.
+        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || ''),
+        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || ''),
+        // HF token should come from in-app Settings (localStorage), not the client bundle.
+        'process.env.HF_TOKEN': JSON.stringify(''),
+        'process.env.VITE_HF_TOKEN': JSON.stringify(''),
       },
       resolve: {
         alias: {
