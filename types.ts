@@ -27,6 +27,10 @@ export interface VideoGenerationRequest {
   prompt: string;
   images?: ImageFile[];
   provider?: VideoProvider;
+  /** Mix a soundtrack onto the finished movie (default true). */
+  soundtrack?: boolean;
+  /** Add TTS narration from the prompt (default true). */
+  voiceover?: boolean;
 }
 
 export enum AppTab {

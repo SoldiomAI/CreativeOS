@@ -15,7 +15,7 @@ const slides = [
   },
   {
     video: 'https://assets.mixkit.co/videos/preview/mixkit-a-person-in-a-gorilla-suit-walking-in-a-forest-41988-large.mp4',
-    title: <>Prompt + Images → <br/> <span className="text-cyan-400">Any Video</span> (HF Free)</>
+    title: <>Prompt → Movie <br/> with <span className="text-cyan-400">Sound</span> (HF Free)</>
   },
 ];
 

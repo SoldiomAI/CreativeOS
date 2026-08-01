@@ -22,7 +22,7 @@ const Dashboard: React.FC = () => {
         </div>
         <div className="flex space-x-2">
             <span className="px-3 py-1 rounded-full bg-emerald-900/30 text-emerald-400 border border-emerald-800 text-xs font-mono">HF FREE: READY</span>
-            <span className="px-3 py-1 rounded-full bg-blue-900/30 text-blue-400 border border-blue-800 text-xs font-mono">LTX / WAN / LOCAL</span>
+            <span className="px-3 py-1 rounded-full bg-blue-900/30 text-blue-400 border border-blue-800 text-xs font-mono">LTX + MUSICGEN + TTS</span>
             <span className="px-3 py-1 rounded-full bg-purple-900/30 text-purple-400 border border-purple-800 text-xs font-mono">VEO: OPTIONAL</span>
         </div>
       </div>

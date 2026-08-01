@@ -118,7 +118,7 @@ const Studio: React.FC = () => {
     return (
       <div className="h-full flex flex-col items-center justify-center animate-fade-in">
         <div className="max-w-md w-full bg-gray-800/50 border border-gray-700 rounded-2xl p-6 shadow-2xl">
-          <h2 className="text-2xl font-bold text-white mb-2 text-center">Video Ready</h2>
+          <h2 className="text-2xl font-bold text-white mb-2 text-center">Movie Ready</h2>
           <p className="text-center text-xs font-mono text-cyan-400 mb-4">
             Provider: {providerUsed || 'unknown'}
           </p>
@@ -273,7 +273,7 @@ const Studio: React.FC = () => {
               : 'bg-gray-800 text-gray-400 hover:text-white'
           }`}
         >
-          Create Video
+          Prompt → Movie
         </button>
         <button
           onClick={() => setMode('ideate')}

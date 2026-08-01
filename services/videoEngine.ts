@@ -2,6 +2,8 @@ import { ImageFile, VideoProvider, VideoGenerationRequest } from '../types';
 import { generateVideo as generateVeoVideo } from './geminiService';
 import { generateLocalVideo } from './localVideoService';
 import { generateWithHfModel } from './hfVideoService';
+import { generateMovieAudio } from './audioService';
+import { estimateVideoDuration, muxVideoWithAudio } from './muxAudioVideo';
 
 export const VIDEO_PROVIDERS: {
   id: VideoProvider;
@@ -92,44 +94,95 @@ const runProvider = async (
   }
 };
 
+const withSoundtrack = async (
+  videoUrl: string,
+  prompt: string,
+  request: VideoGenerationRequest,
+  providerUsed: VideoProvider,
+  setLoadingMessage: (m: string) => void
+): Promise<string> => {
+  const wantMusic = request.soundtrack !== false;
+  const wantVoice = request.voiceover !== false;
+  if (!wantMusic && !wantVoice) return videoUrl;
+
+  // Local compositor already bakes a free score into the WebM.
+  const localAlreadyScored = providerUsed === 'local' && wantMusic;
+  if (localAlreadyScored && !wantVoice) return videoUrl;
+
+  const durationSec = await estimateVideoDuration(videoUrl, 6);
+  const audio = await generateMovieAudio(
+    prompt,
+    durationSec,
+    {
+      soundtrack: wantMusic && !localAlreadyScored,
+      voiceover: wantVoice,
+    },
+    setLoadingMessage
+  );
+
+  const blobs = [audio.music, audio.voice].filter(Boolean) as Blob[];
+  if (!blobs.length) return videoUrl;
+
+  try {
+    return await muxVideoWithAudio(videoUrl, blobs, setLoadingMessage, {
+      musicGain: audio.voice ? 0.42 : 0.7,
+      voiceGain: 1,
+      keepOriginalAudio: localAlreadyScored,
+    });
+  } catch (e: any) {
+    setLoadingMessage('Audio mix failed — returning video without extra mix');
+    console.warn(e);
+    return videoUrl;
+  }
+};
+
 /**
- * Create a video from a prompt and optional images using free HF/GitHub models,
- * with automatic fallbacks so generation still succeeds offline.
+ * Create a movie from a prompt and optional images using free HF/GitHub models,
+ * then mix soundtrack + voiceover from free audio Spaces (with local music fallback).
  */
 export const generateAnyVideo = async (
   request: VideoGenerationRequest,
   setLoadingMessage: (message: string) => void
 ): Promise<{ url: string; providerUsed: VideoProvider }> => {
   const prompt = request.prompt.trim();
-  if (!prompt) throw new Error('Enter a prompt describing the video you want.');
+  if (!prompt) throw new Error('Enter a prompt describing the movie you want.');
 
   const images = request.images || [];
   const provider = request.provider || 'auto';
 
+  let url: string;
+  let providerUsed: VideoProvider;
+
   if (provider !== 'auto') {
-    const url = await runProvider(provider, prompt, images, setLoadingMessage);
-    return { url, providerUsed: provider };
-  }
+    url = await runProvider(provider, prompt, images, setLoadingMessage);
+    providerUsed = provider;
+  } else {
+    const chain: Exclude<VideoProvider, 'auto'>[] = images.length
+      ? ['ltx', 'local']
+      : ['ltx', 'cogvideox', 'wan-space', 'local'];
 
-  // Prefer Spaces known to be healthy; always end with offline local compositor.
-  const chain: Exclude<VideoProvider, 'auto'>[] = images.length
-    ? ['ltx', 'local']
-    : ['ltx', 'cogvideox', 'wan-space', 'local'];
-
-  const errors: string[] = [];
-  for (const candidate of chain) {
-    try {
-      setLoadingMessage(`Trying ${candidate}…`);
-      const url = await runProvider(candidate, prompt, images, setLoadingMessage);
-      return { url, providerUsed: candidate };
-    } catch (e: any) {
-      const msg = e?.message || String(e);
-      errors.push(`${candidate}: ${msg}`);
-      setLoadingMessage(`${candidate} unavailable — trying next free source…`);
+    const errors: string[] = [];
+    let produced: string | null = null;
+    let used: VideoProvider | null = null;
+    for (const candidate of chain) {
+      try {
+        setLoadingMessage(`Trying ${candidate}…`);
+        produced = await runProvider(candidate, prompt, images, setLoadingMessage);
+        used = candidate;
+        break;
+      } catch (e: any) {
+        const msg = e?.message || String(e);
+        errors.push(`${candidate}: ${msg}`);
+        setLoadingMessage(`${candidate} unavailable — trying next free source…`);
+      }
     }
+    if (!produced || !used) {
+      throw new Error(`All free video sources failed.\n${errors.slice(0, 4).join('\n')}`);
+    }
+    url = produced;
+    providerUsed = used;
   }
 
-  throw new Error(
-    `All free video sources failed.\n${errors.slice(0, 4).join('\n')}`
-  );
+  const mixed = await withSoundtrack(url, prompt, request, providerUsed, setLoadingMessage);
+  return { url: mixed, providerUsed };
 };

@@ -13,6 +13,8 @@ Create **any short-form video from a prompt and optional images**, using free op
 | [CogVideoX-2B](https://huggingface.co/spaces/zai-org/CogVideoX-2B-Space) | Text → Video (HF Space) | Free |
 | [Wan2.1](https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B) | HF Inference / Space | Free tier / credits |
 | Local compositor | Prompt + images → WebM in-browser | Always free |
+| [MusicGen](https://huggingface.co/spaces/sanchit-gandhi/musicgen-streaming) | Prompt → soundtrack | Free (+ local score fallback) |
+| [Edge-TTS](https://huggingface.co/spaces/innoai/Edge-TTS-Text-to-Speech) | Prompt → voiceover | Free |
 | Gemini Veo 3.1 | Premium image → video | Paid API key |
 
 View the original AI Studio shell: https://ai.studio/apps/drive/1tuNPhOa8D1Xc0RSVOpdhV4awmrINfxox
@@ -33,7 +35,8 @@ You can also paste an HF token in **Optimization / Connections** inside the app 
 
 ## Factory Studio
 
-1. Open **Create Video**
+1. Open **Prompt → Movie**
 2. Write a prompt, optionally upload images (or generate a still)
-3. Pick a free model (`Auto` tries HF Spaces then local)
-4. Download or distribute
+3. Keep **Soundtrack** + **Voiceover** on (MusicGen / Edge-TTS, with local music fallback)
+4. Pick a free model (`Auto` tries HF Spaces then local)
+5. Play the movie with sound, download, or distribute

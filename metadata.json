@@ -1,5 +1,5 @@
 {
   "name": "Performance Creative OS",
-  "description": "Create any short-form video from a prompt and images using free Hugging Face / GitHub open models, with local and Veo fallbacks.",
+  "description": "Prompt-to-movie: generate short-form video from prompts and images with free Hugging Face models, plus soundtrack and voiceover.",
   "requestFramePermissions": []
 }

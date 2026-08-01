@@ -17,6 +17,8 @@ const VideoCreator: React.FC<VideoCreatorProps> = ({ initialPrompt = '', onCompl
   const [provider, setProvider] = useState<VideoProvider>('auto');
   const [hfToken, setHfToken] = useState(getStoredHfToken());
   const [showToken, setShowToken] = useState(false);
+  const [soundtrack, setSoundtrack] = useState(true);
+  const [voiceover, setVoiceover] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +85,7 @@ const VideoCreator: React.FC<VideoCreatorProps> = ({ initialPrompt = '', onCompl
     setError(null);
     try {
       const { url, providerUsed } = await generateAnyVideo(
-        { prompt, images, provider },
+        { prompt, images, provider, soundtrack, voiceover },
         setLoadingMessage
       );
       onComplete(url, prompt, providerUsed);
@@ -115,13 +117,13 @@ const VideoCreator: React.FC<VideoCreatorProps> = ({ initialPrompt = '', onCompl
         <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-5">
           <div className="flex items-start justify-between gap-3 mb-3">
             <div>
-              <h2 className="text-xl font-bold text-white">Create Any Video</h2>
+              <h2 className="text-xl font-bold text-white">Prompt → Movie</h2>
               <p className="text-gray-400 text-sm mt-1">
-                Prompt + optional images → free Hugging Face / GitHub open models, with local fallback.
+                Prompt + optional images → free HF/GitHub video models, then MusicGen / Edge-TTS / local score.
               </p>
             </div>
             <span className="shrink-0 text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded border border-emerald-800 text-emerald-400 bg-emerald-900/20">
-              Free sources
+              Free + sound
             </span>
           </div>
 
@@ -133,6 +135,35 @@ const VideoCreator: React.FC<VideoCreatorProps> = ({ initialPrompt = '', onCompl
             className="w-full h-32 bg-gray-900 border border-gray-600 rounded-lg p-3 text-sm text-gray-200 focus:border-cyan-500 outline-none resize-none"
             disabled={isLoading}
           />
+
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <label className="flex items-center gap-3 p-3 rounded-lg border border-gray-700 bg-gray-900/40 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={soundtrack}
+                onChange={(e) => setSoundtrack(e.target.checked)}
+                disabled={isLoading}
+                className="accent-cyan-500"
+              />
+              <span>
+                <span className="block text-sm text-white font-semibold">Soundtrack</span>
+                <span className="block text-xs text-gray-400">MusicGen HF Space → local score fallback</span>
+              </span>
+            </label>
+            <label className="flex items-center gap-3 p-3 rounded-lg border border-gray-700 bg-gray-900/40 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={voiceover}
+                onChange={(e) => setVoiceover(e.target.checked)}
+                disabled={isLoading}
+                className="accent-cyan-500"
+              />
+              <span>
+                <span className="block text-sm text-white font-semibold">Voiceover</span>
+                <span className="block text-xs text-gray-400">Edge-TTS narration from your prompt</span>
+              </span>
+            </label>
+          </div>
 
           <div className="mt-4">
             <label className="block text-xs font-mono text-gray-500 mb-2 uppercase">Model source</label>
@@ -203,10 +234,10 @@ const VideoCreator: React.FC<VideoCreatorProps> = ({ initialPrompt = '', onCompl
         >
           {isLoading ? (
             <span className="inline-flex items-center gap-2 justify-center">
-              <Spinner className="w-5 h-5" /> Creating…
+              <Spinner className="w-5 h-5" /> Making movie…
             </span>
           ) : (
-            'Create Video'
+            'Create Movie with Sound'
           )}
         </button>
       </div>
@@ -286,6 +317,16 @@ const VideoCreator: React.FC<VideoCreatorProps> = ({ initialPrompt = '', onCompl
                 Wan2.1
               </a>{' '}
               + local free compositor fallback
+            </li>
+            <li>
+              <a className="text-cyan-400 hover:underline" href="https://huggingface.co/spaces/sanchit-gandhi/musicgen-streaming" target="_blank" rel="noreferrer">
+                MusicGen
+              </a>{' '}
+              soundtrack +{' '}
+              <a className="text-cyan-400 hover:underline" href="https://huggingface.co/spaces/innoai/Edge-TTS-Text-to-Speech" target="_blank" rel="noreferrer">
+                Edge-TTS
+              </a>{' '}
+              voice
             </li>
           </ul>
         </div>
