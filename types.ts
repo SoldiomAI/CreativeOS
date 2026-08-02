@@ -14,6 +14,8 @@ export type VideoProvider =
   | 'wan-space'
   | 'hf-inference'
   | 'local'
+  | 'comfy'
+  | 'duix'
   | 'veo';
 
 export type HfVideoModel =

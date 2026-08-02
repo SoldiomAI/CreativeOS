@@ -1,6 +1,7 @@
 import { Client } from '@gradio/client';
 import { getStoredHfToken } from './hfVideoService';
 import { withTimeout } from './utils';
+import { generateVoiceoverWithOmniVoice } from './omniVoiceService';
 
 const SPACE_TIMEOUT_MS = 120_000;
 
@@ -313,10 +314,16 @@ export const generateMovieAudio = async (
 
   if (options.voiceover) {
     try {
-      const voice = await generateVoiceoverWithHf(buildNarrationText(prompt), setLoadingMessage);
+      const voice = await generateVoiceoverWithOmniVoice(buildNarrationText(prompt), setLoadingMessage);
       tracks.push({ blob: voice, kind: 'voice' });
-    } catch {
-      setLoadingMessage('Voiceover Space busy — continuing with soundtrack only…');
+    } catch (e) {
+      console.warn('OmniVoice unavailable, trying Edge-TTS', e);
+      try {
+        const voice = await generateVoiceoverWithHf(buildNarrationText(prompt), setLoadingMessage);
+        tracks.push({ blob: voice, kind: 'voice' });
+      } catch {
+        setLoadingMessage('Voiceover Spaces busy — continuing with soundtrack only…');
+      }
     }
   }
 

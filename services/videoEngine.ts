@@ -5,6 +5,9 @@ import { generateWithHfModel, getStoredHfToken } from './hfVideoService';
 import { generateMovieAudio } from './audioService';
 import { estimateVideoDuration, muxVideoWithAudio } from './muxAudioVideo';
 import { withTimeout } from './utils';
+import { generateImageWithComfy, pingComfyUi } from './comfyService';
+import { submitDuixAvatarVideo, synthesizeDuixVoice } from './duixService';
+import { fileToBase64 } from './geminiService';
 
 const PROVIDER_TIMEOUT_MS = 180_000;
 
@@ -58,6 +61,20 @@ export const VIDEO_PROVIDERS: {
     needsImage: false,
   },
   {
+    id: 'comfy',
+    label: 'ComfyUI (local)',
+    blurb: 'github.com/Comfy-Org/ComfyUI — still→local movie',
+    free: true,
+    needsImage: false,
+  },
+  {
+    id: 'duix',
+    label: 'Duix.Avatar (local)',
+    blurb: 'github.com/duixcom/Duix-Avatar — talking avatar',
+    free: true,
+    needsImage: false,
+  },
+  {
     id: 'local',
     label: 'Local Free Compositor',
     blurb: 'Always works offline from prompt + images',
@@ -73,6 +90,39 @@ export const VIDEO_PROVIDERS: {
   },
 ];
 
+const runComfyMovie = async (
+  prompt: string,
+  images: ImageFile[],
+  setLoadingMessage: (m: string) => void
+): Promise<string> => {
+  let sourceImages = images;
+  if (!sourceImages.length) {
+    const url = await generateImageWithComfy(prompt, setLoadingMessage);
+    const file = await fetch(url)
+      .then((r) => r.blob())
+      .then((b) => new File([b], 'comfy.jpg', { type: b.type || 'image/jpeg' }));
+    const base64 = await fileToBase64(file);
+    sourceImages = [
+      {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        base64,
+        url,
+      },
+    ];
+  }
+  return generateLocalVideo(prompt, sourceImages, setLoadingMessage);
+};
+
+const runDuixMovie = async (
+  prompt: string,
+  setLoadingMessage: (m: string) => void
+): Promise<string> => {
+  const audioPath = await synthesizeDuixVoice(prompt, setLoadingMessage);
+  return submitDuixAvatarVideo(audioPath, setLoadingMessage);
+};
+
 const runProvider = async (
   provider: Exclude<VideoProvider, 'auto'>,
   prompt: string,
@@ -83,6 +133,10 @@ const runProvider = async (
     switch (provider) {
       case 'local':
         return generateLocalVideo(prompt, images, setLoadingMessage);
+      case 'comfy':
+        return runComfyMovie(prompt, images, setLoadingMessage);
+      case 'duix':
+        return runDuixMovie(prompt, setLoadingMessage);
       case 'veo': {
         if (!images[0]) throw new Error('Veo needs at least one source image');
         return generateVeoVideo(images[0], prompt, setLoadingMessage);
@@ -108,11 +162,15 @@ const withSoundtrack = async (
   providerUsed: VideoProvider,
   setLoadingMessage: (m: string) => void
 ): Promise<string> => {
+  // Duix.Avatar already ships lip-synced speech; skip extra mix.
+  if (providerUsed === 'duix') return videoUrl;
+
   const wantMusic = request.soundtrack !== false;
   const wantVoice = request.voiceover !== false;
   if (!wantMusic && !wantVoice) return videoUrl;
 
-  const localAlreadyScored = providerUsed === 'local' && wantMusic;
+  const localAlreadyScored =
+    (providerUsed === 'local' || providerUsed === 'comfy') && wantMusic;
   if (localAlreadyScored && !wantVoice) return videoUrl;
 
   const durationSec = await estimateVideoDuration(videoUrl, 6);
@@ -164,11 +222,16 @@ export const generateAnyVideo = async (
     providerUsed = provider;
   } else {
     const hasToken = Boolean(getStoredHfToken() || process.env.HF_TOKEN);
+    const comfyUp = await pingComfyUi().catch(() => false);
     const chain: Exclude<VideoProvider, 'auto'>[] = images.length
       ? hasToken
         ? ['ltx', 'hf-inference', 'local']
-        : ['ltx', 'local']
-      : ['ltx', 'cogvideox', 'wan-space', 'local'];
+        : comfyUp
+          ? ['ltx', 'comfy', 'local']
+          : ['ltx', 'local']
+      : comfyUp
+        ? ['ltx', 'cogvideox', 'comfy', 'local']
+        : ['ltx', 'cogvideox', 'wan-space', 'local'];
 
     const errors: string[] = [];
     let produced: string | null = null;
@@ -194,8 +257,13 @@ export const generateAnyVideo = async (
 
   const mixed = await withSoundtrack(url, prompt, request, providerUsed, setLoadingMessage);
   const hasAudio =
-    wantAudio &&
-    (providerUsed === 'local' || mixed !== url || request.soundtrack !== false || request.voiceover !== false);
+    providerUsed === 'duix' ||
+    (wantAudio &&
+      (providerUsed === 'local' ||
+        providerUsed === 'comfy' ||
+        mixed !== url ||
+        request.soundtrack !== false ||
+        request.voiceover !== false));
 
   return { url: mixed, providerUsed, hasAudio };
 };

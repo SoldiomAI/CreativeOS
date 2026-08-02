@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ImageFile, VideoProvider } from '../types';
 import { fileToBase64, generateImage } from '../services/geminiService';
 import { generateAnyVideo, VIDEO_PROVIDERS } from '../services/videoEngine';
 import { getStoredHfToken, setStoredHfToken } from '../services/hfVideoService';
+import { generateImageWithComfy } from '../services/comfyService';
+import { isSpeechDictationSupported, startPromptDictation } from '../services/speechDictation';
 import { revokeObjectUrl, safeErrorMessage } from '../services/utils';
 import Spinner from './Spinner';
 import LoadingOverlay from './LoadingOverlay';
@@ -28,6 +30,17 @@ const VideoCreator: React.FC<VideoCreatorProps> = ({ initialPrompt = '', onCompl
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [dictating, setDictating] = useState(false);
+  const [interimDictation, setInterimDictation] = useState('');
+  const stopDictationRef = useRef<(() => void) | null>(null);
+  const promptBaseRef = useRef(initialPrompt);
+  const canDictate = isSpeechDictationSupported();
+
+  useEffect(() => {
+    return () => {
+      stopDictationRef.current?.();
+    };
+  }, []);
 
   const handleFiles = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -46,6 +59,25 @@ const VideoCreator: React.FC<VideoCreatorProps> = ({ initialPrompt = '', onCompl
     setImages((prev) => [...prev, ...next].slice(0, 6));
   };
 
+  const pushStill = async (url: string, name: string) => {
+    const file = await fetch(url)
+      .then((r) => r.blob())
+      .then((blob) => new File([blob], name, { type: blob.type || 'image/jpeg' }));
+    const base64 = await fileToBase64(file);
+    setImages((prev) =>
+      [
+        {
+          name,
+          type: file.type,
+          size: file.size,
+          base64,
+          url,
+        },
+        ...prev,
+      ].slice(0, 6)
+    );
+  };
+
   const handleGenerateStill = async () => {
     if (!prompt.trim()) {
       setError('Add a prompt first to generate a still.');
@@ -56,28 +88,67 @@ const VideoCreator: React.FC<VideoCreatorProps> = ({ initialPrompt = '', onCompl
     setError(null);
     try {
       const url = await generateImage(prompt);
-      const file = await fetch(url)
-        .then((r) => r.blob())
-        .then((blob) => new File([blob], 'generated.jpg', { type: 'image/jpeg' }));
-      const base64 = await fileToBase64(file);
-      setImages((prev) =>
-        [
-          {
-            name: 'generated.jpg',
-            type: 'image/jpeg',
-            size: file.size,
-            base64,
-            url,
-          },
-          ...prev,
-        ].slice(0, 6)
+      await pushStill(url, 'generated.jpg');
+    } catch (e: unknown) {
+      setError(
+        safeErrorMessage(e, 'Still generation failed. You can still upload images or use prompt-only models.')
       );
-    } catch (e: any) {
-      setError(e.message || 'Still generation failed. You can still upload images or use prompt-only models.');
     } finally {
       setIsLoading(false);
       setLoadingMessage('');
     }
+  };
+
+  const handleComfyStill = async () => {
+    if (!prompt.trim()) {
+      setError('Add a prompt first to generate a ComfyUI still.');
+      return;
+    }
+    setIsLoading(true);
+    setError(null);
+    try {
+      const url = await generateImageWithComfy(prompt, setLoadingMessage);
+      await pushStill(url, 'comfy.jpg');
+    } catch (e: unknown) {
+      setError(safeErrorMessage(e, 'ComfyUI still failed'));
+    } finally {
+      setIsLoading(false);
+      setLoadingMessage('');
+    }
+  };
+
+  const toggleDictation = () => {
+    if (dictating) {
+      stopDictationRef.current?.();
+      stopDictationRef.current = null;
+      setDictating(false);
+      setInterimDictation('');
+      return;
+    }
+    promptBaseRef.current = prompt.trim();
+    setDictating(true);
+    setInterimDictation('');
+    setError(null);
+    stopDictationRef.current = startPromptDictation(
+      (text, isFinal) => {
+        if (isFinal) {
+          const base = promptBaseRef.current;
+          const next = base ? `${base} ${text}`.trim() : text.trim();
+          promptBaseRef.current = next;
+          setPrompt(next);
+          setInterimDictation('');
+        } else {
+          const base = promptBaseRef.current;
+          setInterimDictation(text);
+          setPrompt(base ? `${base} ${text}`.trim() : text);
+        }
+      },
+      (message) => {
+        setError(message);
+        setDictating(false);
+        stopDictationRef.current = null;
+      }
+    );
   };
 
   const handleCreate = async () => {
@@ -125,7 +196,8 @@ const VideoCreator: React.FC<VideoCreatorProps> = ({ initialPrompt = '', onCompl
             <div>
               <h2 className="text-xl font-bold text-white">Prompt → Movie</h2>
               <p className="text-gray-400 text-sm mt-1">
-                Prompt + optional images → free HF/GitHub video models, then MusicGen / Edge-TTS / local score.
+                Prompt + optional images → free HF / GitHub models (OmniVoice, ComfyUI, Duix, Handy-style
+                dictation), then soundtrack + voiceover.
               </p>
             </div>
             <span className="shrink-0 text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded border border-emerald-800 text-emerald-400 bg-emerald-900/20">
@@ -133,14 +205,49 @@ const VideoCreator: React.FC<VideoCreatorProps> = ({ initialPrompt = '', onCompl
             </span>
           </div>
 
-          <label className="block text-xs font-mono text-gray-500 mb-1 uppercase">Prompt</label>
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <label className="block text-xs font-mono text-gray-500 uppercase">Prompt</label>
+            <button
+              type="button"
+              onClick={toggleDictation}
+              disabled={isLoading || (!canDictate && !dictating)}
+              className={`text-xs px-2 py-1 rounded border transition ${
+                dictating
+                  ? 'border-rose-500 text-rose-300 bg-rose-900/30'
+                  : 'border-gray-600 text-gray-300 hover:border-cyan-500 hover:text-cyan-300'
+              } disabled:opacity-40`}
+              title={
+                canDictate
+                  ? 'Dictate prompt (Handy-inspired browser STT)'
+                  : 'Web Speech unavailable — use Handy desktop for offline STT'
+              }
+            >
+              {dictating ? 'Stop dictation' : canDictate ? 'Dictate' : 'Dictate (needs Chrome/Edge)'}
+            </button>
+          </div>
           <textarea
             value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
+            onChange={(e) => {
+              setPrompt(e.target.value);
+              if (!dictating) promptBaseRef.current = e.target.value;
+            }}
             placeholder="e.g. A cyberpunk street-food cart at night, neon rain, cinematic push-in, vertical short-form"
             className="w-full h-32 bg-gray-900 border border-gray-600 rounded-lg p-3 text-sm text-gray-200 focus:border-cyan-500 outline-none resize-none"
             disabled={isLoading}
           />
+          {dictating && (
+            <p className="text-[11px] text-rose-300/80 mt-1 font-mono">
+              Listening…{interimDictation ? ` “${interimDictation.slice(0, 60)}”` : ''} · Inspired by{' '}
+              <a
+                className="underline"
+                href="https://github.com/cjpais/Handy"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Handy
+              </a>
+            </p>
+          )}
 
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
             <label className="flex items-center gap-3 p-3 rounded-lg border border-gray-700 bg-gray-900/40 cursor-pointer">
@@ -166,7 +273,7 @@ const VideoCreator: React.FC<VideoCreatorProps> = ({ initialPrompt = '', onCompl
               />
               <span>
                 <span className="block text-sm text-white font-semibold">Voiceover</span>
-                <span className="block text-xs text-gray-400">Edge-TTS narration from your prompt</span>
+                <span className="block text-xs text-gray-400">OmniVoice → Edge-TTS from your prompt</span>
               </span>
             </label>
           </div>
@@ -300,45 +407,76 @@ const VideoCreator: React.FC<VideoCreatorProps> = ({ initialPrompt = '', onCompl
               disabled={isLoading || !prompt.trim()}
               className="py-2.5 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white text-sm transition disabled:opacity-50"
             >
-              Generate still from prompt (Imagen)
+              Generate still (Imagen)
+            </button>
+            <button
+              type="button"
+              onClick={handleComfyStill}
+              disabled={isLoading || !prompt.trim()}
+              className="py-2.5 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white text-sm transition disabled:opacity-50"
+            >
+              Generate still (local ComfyUI)
             </button>
           </div>
         </div>
 
         <div className="bg-gray-900/60 border border-gray-700 rounded-xl p-4 text-xs text-gray-400 space-y-2">
-          <p className="text-gray-300 font-semibold">Open sources wired in</p>
+          <p className="text-gray-300 font-semibold">GitHub + HF sources</p>
           <ul className="list-disc pl-4 space-y-1">
             <li>
-              <a className="text-cyan-400 hover:underline" href="https://huggingface.co/spaces/Lightricks/ltx-video-distilled" target="_blank" rel="noreferrer">
-                Lightricks/LTX-Video
+              <a
+                className="text-cyan-400 hover:underline"
+                href="https://github.com/k2-fsa/OmniVoice"
+                target="_blank"
+                rel="noreferrer"
+              >
+                k2-fsa/OmniVoice
               </a>{' '}
-              (HF Space)
+              — multilingual TTS voiceover
             </li>
             <li>
-              <a className="text-cyan-400 hover:underline" href="https://huggingface.co/spaces/ByteDance/AnimateDiff-Lightning" target="_blank" rel="noreferrer">
-                AnimateDiff-Lightning
+              <a
+                className="text-cyan-400 hover:underline"
+                href="https://github.com/Comfy-Org/ComfyUI"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Comfy-Org/ComfyUI
+              </a>{' '}
+              — local still → movie
+            </li>
+            <li>
+              <a
+                className="text-cyan-400 hover:underline"
+                href="https://github.com/cjpais/Handy"
+                target="_blank"
+                rel="noreferrer"
+              >
+                cjpais/Handy
+              </a>{' '}
+              — offline STT (Dictate uses Web Speech; Handy for desktop)
+            </li>
+            <li>
+              <a
+                className="text-cyan-400 hover:underline"
+                href="https://github.com/duixcom/Duix-Avatar"
+                target="_blank"
+                rel="noreferrer"
+              >
+                duixcom/Duix-Avatar
+              </a>{' '}
+              — local talking avatar
+            </li>
+            <li>
+              <a
+                className="text-cyan-400 hover:underline"
+                href="https://huggingface.co/spaces/Lightricks/ltx-video-distilled"
+                target="_blank"
+                rel="noreferrer"
+              >
+                LTX-Video
               </a>
-            </li>
-            <li>
-              <a className="text-cyan-400 hover:underline" href="https://huggingface.co/spaces/zai-org/CogVideoX-2B-Space" target="_blank" rel="noreferrer">
-                CogVideoX-2B
-              </a>
-            </li>
-            <li>
-              <a className="text-cyan-400 hover:underline" href="https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B" target="_blank" rel="noreferrer">
-                Wan2.1
-              </a>{' '}
-              + local free compositor fallback
-            </li>
-            <li>
-              <a className="text-cyan-400 hover:underline" href="https://huggingface.co/spaces/sanchit-gandhi/musicgen-streaming" target="_blank" rel="noreferrer">
-                MusicGen
-              </a>{' '}
-              soundtrack +{' '}
-              <a className="text-cyan-400 hover:underline" href="https://huggingface.co/spaces/innoai/Edge-TTS-Text-to-Speech" target="_blank" rel="noreferrer">
-                Edge-TTS
-              </a>{' '}
-              voice
+              , AnimateDiff, CogVideoX, Wan + MusicGen / Edge-TTS
             </li>
           </ul>
         </div>
