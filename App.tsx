@@ -33,12 +33,21 @@ import {
   setMuapiKey,
   setMuapiT2vEndpoint,
 } from './services/muapiService';
+import {
+  getGoogleOAuthClientId,
+  getYoutubePrivacy,
+  setGoogleOAuthClientId,
+  setYoutubePrivacy,
+  YoutubePrivacy,
+} from './services/youtubeService';
 import { AppTab } from './types';
 
 export default function App() {
   const [hasStarted, setHasStarted] = useState(false);
   const [activeTab, setActiveTab] = useState<AppTab>(AppTab.STUDIO);
   const [hfToken, setHfToken] = useState(getStoredHfToken());
+  const [googleClientId, setGoogleClientIdState] = useState(getGoogleOAuthClientId());
+  const [ytPrivacy, setYtPrivacyState] = useState<YoutubePrivacy>(getYoutubePrivacy());
   const [muapiKey, setMuapiKeyState] = useState(getMuapiKey());
   const [muapiT2v, setMuapiT2vState] = useState(getMuapiT2vEndpoint());
   const [muapiI2v, setMuapiI2vState] = useState(getMuapiI2vEndpoint());
@@ -81,6 +90,45 @@ export default function App() {
                   keeps :3000)
                 </p>
               </div>
+
+              <section className="space-y-3 border border-gray-700 rounded-xl p-4 bg-gray-800/40">
+                <h3 className="text-white font-semibold">Google / YouTube (real publish)</h3>
+                <p className="text-gray-400 text-sm">
+                  OAuth Web Client ID from Google Cloud Console. Enable{' '}
+                  <span className="text-gray-200">YouTube Data API v3</span>. Authorized JavaScript origin:{' '}
+                  <span className="text-amber-200">http://localhost:5173</span>
+                </p>
+                <label className="block text-xs text-gray-500 font-mono uppercase">OAuth client ID</label>
+                <input
+                  value={googleClientId}
+                  onChange={(e) => {
+                    setGoogleClientIdState(e.target.value);
+                    setGoogleOAuthClientId(e.target.value);
+                  }}
+                  placeholder="xxxxx.apps.googleusercontent.com"
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
+                />
+                <label className="block text-xs text-gray-500 font-mono uppercase">
+                  Default privacy (when not scheduling)
+                </label>
+                <select
+                  value={ytPrivacy}
+                  onChange={(e) => {
+                    const v = e.target.value as YoutubePrivacy;
+                    setYtPrivacyState(v);
+                    setYoutubePrivacy(v);
+                  }}
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
+                >
+                  <option value="unlisted">Unlisted</option>
+                  <option value="public">Public</option>
+                  <option value="private">Private</option>
+                </select>
+                <p className="text-xs text-gray-500">
+                  Future schedule date/time → YouTube private until publishAt (real schedule). Gemini still
+                  writes captions via GEMINI_API_KEY.
+                </p>
+              </section>
 
               <section className="space-y-3 border border-gray-700 rounded-xl p-4 bg-gray-800/40">
                 <h3 className="text-white font-semibold">Hugging Face</h3>

@@ -9,6 +9,8 @@ import {
   formatCaptionWithTags,
 } from '../services/socialExport';
 import { captureVideoCover, downloadCover } from '../services/coverFrame';
+import { publishForReal, PlatformPublishStatus } from '../services/publishService';
+import { getGoogleOAuthClientId } from '../services/youtubeService';
 import { revokeObjectUrl } from '../services/utils';
 import VideoCreator from './VideoCreator';
 import Spinner from './Spinner';
@@ -49,13 +51,13 @@ const Studio: React.FC = () => {
   const [isGeneratingSocial, setIsGeneratingSocial] = useState(false);
   const [scheduleDate, setScheduleDate] = useState(new Date().toISOString().split('T')[0]);
   const [scheduleTime, setScheduleTime] = useState('18:00');
-  const [platformStatuses, setPlatformStatuses] = useState<{
-    [key: string]: 'idle' | 'uploading' | 'optimizing' | 'done';
-  }>({
+  const [platformStatuses, setPlatformStatuses] = useState<Record<string, PlatformPublishStatus>>({
     youtube: 'idle',
     instagram: 'idle',
     tiktok: 'idle',
   });
+  const [platformMessages, setPlatformMessages] = useState<Record<string, string>>({});
+  const [publishLinks, setPublishLinks] = useState<Record<string, string>>({});
   const [isPublishing, setIsPublishing] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -214,17 +216,45 @@ const Studio: React.FC = () => {
   };
 
   const handlePublish = async () => {
+    if (!videoUrl || !socialCampaign) return;
     setIsPublishing(true);
-    const platforms = ['youtube', 'instagram', 'tiktok'];
-    for (const platform of platforms) {
-      setPlatformStatuses((prev) => ({ ...prev, [platform]: 'uploading' }));
-      await new Promise((resolve) => setTimeout(resolve, 900));
-      setPlatformStatuses((prev) => ({ ...prev, [platform]: 'optimizing' }));
-      await new Promise((resolve) => setTimeout(resolve, 600));
-      setPlatformStatuses((prev) => ({ ...prev, [platform]: 'done' }));
+    setError(null);
+    setPublishLinks({});
+    setPlatformMessages({});
+    setPlatformStatuses({ youtube: 'idle', instagram: 'idle', tiktok: 'idle' });
+
+    try {
+      const { results, youtube } = await publishForReal({
+        videoUrl,
+        campaign: socialCampaign,
+        prompt: usedPrompt,
+        hook: usedHook,
+        scheduleDate,
+        scheduleTime,
+        onPlatform: (platform, status, message) => {
+          setPlatformStatuses((prev) => ({ ...prev, [platform]: status }));
+          setPlatformMessages((prev) => ({ ...prev, [platform]: message }));
+        },
+      });
+
+      const links: Record<string, string> = {};
+      if (youtube?.url) links.youtube = youtube.url;
+      setPublishLinks(links);
+
+      const hardFail = results.filter((r) => r.status === 'error');
+      if (hardFail.length === results.length) {
+        setError(hardFail.map((r) => `${r.platform}: ${r.message}`).join('\n'));
+      } else {
+        setIsPublished(true);
+        if (hardFail.length) {
+          setError(hardFail.map((r) => `${r.platform}: ${r.message}`).join('\n'));
+        }
+      }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Publish failed');
+    } finally {
+      setIsPublishing(false);
     }
-    setIsPublishing(false);
-    setIsPublished(true);
   };
 
   const reset = () => {
@@ -247,6 +277,8 @@ const Studio: React.FC = () => {
     setSeedHook('');
     setSocialCampaign(null);
     setPlatformStatuses({ youtube: 'idle', instagram: 'idle', tiktok: 'idle' });
+    setPlatformMessages({});
+    setPublishLinks({});
     setIsPublished(false);
     setIsPublishing(false);
     setError(null);
@@ -332,32 +364,42 @@ const Studio: React.FC = () => {
 
     if (isPublished) {
       return (
-        <div className="h-full flex flex-col items-center justify-center animate-fade-in">
-          <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-green-500/40">
-            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="h-full flex flex-col items-center justify-center cos-rise">
+          <div className="w-20 h-20 bg-amber-500 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-amber-500/40">
+            <svg className="w-10 h-10 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-3xl font-bold text-white mb-2">Demo Schedule Complete</h2>
-          <p className="text-gray-400 mb-2 text-sm">
-            Preview only — no real posts were published. Use Export Pack or a scheduler like{' '}
-            <a
-              className="text-cyan-400 underline"
-              href="https://github.com/Anil-matcha/Free-AI-Social-Media-Scheduler"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Free-AI-Social-Media-Scheduler
-            </a>
-            .
+          <h2 className="cos-display text-3xl text-white mb-2">Published for real</h2>
+          <p className="text-[#9aa8bc] mb-2 text-sm text-center max-w-md">
+            YouTube uses Google OAuth + YouTube Data API. Instagram/TikTok use your device share sheet when
+            available.
           </p>
-          <p className="text-gray-500 mb-8 font-mono text-xs">
+          <p className="text-white/50 mb-4 font-mono text-xs">
             {scheduleDate} @ {scheduleTime}
           </p>
-          <button
-            onClick={reset}
-            className="px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition"
-          >
+          {publishLinks.youtube && (
+            <a
+              href={publishLinks.youtube}
+              target="_blank"
+              rel="noreferrer"
+              className="mb-6 text-amber-200 underline text-sm"
+            >
+              Open YouTube Short
+            </a>
+          )}
+          {error && (
+            <p className="text-amber-200/90 text-xs mb-4 max-w-md text-center whitespace-pre-wrap">{error}</p>
+          )}
+          <div className="space-y-2 text-xs text-[#9aa8bc] mb-8">
+            {(['youtube', 'instagram', 'tiktok'] as const).map((p) => (
+              <div key={p}>
+                <span className="text-white/70 uppercase tracking-wider mr-2">{p}</span>
+                {platformMessages[p] || platformStatuses[p]}
+              </div>
+            ))}
+          </div>
+          <button onClick={reset} className="px-8 py-3 cos-btn-primary rounded-xl">
             Return to Studio
           </button>
         </div>
@@ -367,7 +409,7 @@ const Studio: React.FC = () => {
     return (
       <div className="h-full flex flex-col animate-fade-in">
         {error && (
-          <div className="mb-3 bg-amber-900/20 border border-amber-800 p-3 rounded text-amber-200 text-sm">
+          <div className="mb-3 bg-amber-900/20 border border-amber-800 p-3 rounded text-amber-200 text-sm whitespace-pre-wrap">
             {error}
           </div>
         )}
@@ -376,16 +418,20 @@ const Studio: React.FC = () => {
             {copyNote}
           </div>
         )}
-        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6 bg-gray-800/50 p-4 rounded-xl border border-gray-700">
+        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6 cos-panel p-4 rounded-xl">
           <div>
             <h2 className="text-xl font-bold text-white flex items-center gap-2">
               Caption Studio
-              <span className="px-2 py-0.5 rounded bg-amber-900/40 text-amber-300 text-[10px] border border-amber-800">
-                DEMO PUBLISH
+              <span className="px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-300 text-[10px] border border-emerald-800">
+                REAL PUBLISH
               </span>
             </h2>
             <p className="text-gray-400 text-sm">
-              Edit captions, copy per platform, or download an export pack. Schedule is simulated.
+              YouTube Shorts uploads via Google. Schedule date/time is honored by YouTube when in the future.
+              IG/TT open the real system share sheet.
+              {!getGoogleOAuthClientId() && (
+                <span className="text-amber-300"> Add Google OAuth Client ID in Optimization first.</span>
+              )}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -413,9 +459,9 @@ const Studio: React.FC = () => {
             <button
               onClick={handlePublish}
               disabled={isPublishing}
-              className="bg-green-600 hover:bg-green-500 disabled:bg-gray-600 text-white font-bold px-6 py-2 rounded-lg"
+              className="cos-btn-primary disabled:opacity-50 text-ink font-bold px-6 py-2 rounded-lg"
             >
-              {isPublishing ? 'Simulating…' : 'Simulate Schedule'}
+              {isPublishing ? 'Publishing…' : 'Publish for real'}
             </button>
           </div>
         </div>
@@ -433,13 +479,29 @@ const Studio: React.FC = () => {
               className="bg-gray-900 border border-gray-700 rounded-xl overflow-hidden flex flex-col relative"
             >
               {platformStatuses[key] !== 'idle' && (
-                <div className="absolute inset-0 bg-black/80 z-10 flex flex-col items-center justify-center">
+                <div className="absolute inset-0 bg-black/80 z-10 flex flex-col items-center justify-center p-4 text-center">
                   {platformStatuses[key] === 'done' ? (
-                    <div className="text-green-500">Demo scheduled</div>
+                    <div className="text-emerald-400 text-sm">
+                      {platformMessages[key] || 'Done'}
+                      {publishLinks[key] && (
+                        <a
+                          className="block mt-2 underline text-amber-200"
+                          href={publishLinks[key]}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Open
+                        </a>
+                      )}
+                    </div>
+                  ) : platformStatuses[key] === 'error' || platformStatuses[key] === 'skipped' ? (
+                    <div className="text-amber-200 text-xs whitespace-pre-wrap">
+                      {platformMessages[key] || platformStatuses[key]}
+                    </div>
                   ) : (
-                    <div className={`${PLATFORM_STATUS_COLOR[key]} flex flex-col items-center`}>
+                    <div className={`${PLATFORM_STATUS_COLOR[key]} flex flex-col items-center text-xs`}>
                       <Spinner className="mb-2" />
-                      {platformStatuses[key]}
+                      {platformMessages[key] || platformStatuses[key]}
                     </div>
                   )}
                 </div>
@@ -473,35 +535,8 @@ const Studio: React.FC = () => {
         </div>
 
         <p className="text-[11px] text-gray-500 mt-2 pb-2">
-          Real posting:{' '}
-          <a
-            className="text-cyan-400 underline"
-            href="https://github.com/Anil-matcha/Free-AI-Social-Media-Scheduler"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Social Media Scheduler
-          </a>
-          {' · '}
-          Long→shorts:{' '}
-          <a
-            className="text-cyan-400 underline"
-            href="https://github.com/SamurAIGPT/AI-Youtube-Shorts-Generator"
-            target="_blank"
-            rel="noreferrer"
-          >
-            AI YouTube Shorts Generator
-          </a>
-          {' · '}
-          Multi-model studio:{' '}
-          <a
-            className="text-cyan-400 underline"
-            href="https://github.com/Anil-matcha/Open-Generative-AI"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Open Generative AI
-          </a>
+          Google power: YouTube Data API v3 + Gemini captions. Enable YouTube Data API and set OAuth Web Client
+          ID (authorized JS origin <span className="text-gray-300">http://localhost:5173</span>).
         </p>
       </div>
     );

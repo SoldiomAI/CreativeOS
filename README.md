@@ -41,6 +41,14 @@ View the original AI Studio shell: https://ai.studio/apps/drive/1tuNPhOa8D1Xc0RS
 4. Paste tokens in **Optimization / Connections** (browser `localStorage` only — not bundled):
    - Free HF token for Spaces / Inference
    - Optional MuAPI key for Open Generative AI models (proxied via `/api/muapi`)
+   - **Google OAuth Web Client ID** for real YouTube Shorts publish (YouTube Data API v3; JS origin `http://localhost:5173`)
+   - Optional `GOOGLE_CLIENT_ID` in `.env.local`
+
+### Real social publish
+
+- **YouTube Shorts** — Google OAuth → YouTube Data API resumable upload. Future date/time uses YouTube `publishAt`.
+- **Instagram / TikTok** — OS share sheet with the video file when supported (mobile). Desktop copies caption.
+- Captions use **Gemini** when `GEMINI_API_KEY` is set.
 
 ### Optional local backends
 

@@ -38,6 +38,8 @@ export default defineConfig(({ mode }) => {
         // Gemini key for local AI Studio / Imagen / Veo. Prefer .env.local; never commit secrets.
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || ''),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || ''),
+        'process.env.GOOGLE_CLIENT_ID': JSON.stringify(env.GOOGLE_CLIENT_ID || env.VITE_GOOGLE_CLIENT_ID || ''),
+        'process.env.VITE_GOOGLE_CLIENT_ID': JSON.stringify(env.VITE_GOOGLE_CLIENT_ID || env.GOOGLE_CLIENT_ID || ''),
         // HF token should come from in-app Settings (localStorage), not the client bundle.
         'process.env.HF_TOKEN': JSON.stringify(''),
         'process.env.VITE_HF_TOKEN': JSON.stringify(''),
