@@ -1,80 +1,137 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { libraryStats, LibraryItem } from '../services/libraryStore';
+import { getGodModeEnabled } from '../services/godMode';
+import { getMuapiKey } from '../services/muapiService';
+import { getStoredHfToken } from '../services/hfVideoService';
+import { AppTab } from '../types';
 
-const StatCard = ({ title, value, change, trend }: { title: string, value: string, change: string, trend: 'up' | 'down' | 'neutral' }) => (
-  <div className="bg-gray-800/50 border border-gray-700 p-4 rounded-lg backdrop-blur-sm">
-    <h3 className="text-gray-400 text-xs font-mono uppercase tracking-widest mb-1">{title}</h3>
-    <div className="flex items-end justify-between">
-      <span className="text-2xl font-bold text-white">{value}</span>
-      <span className={`text-sm font-mono ${trend === 'up' ? 'text-green-400' : trend === 'down' ? 'text-red-400' : 'text-gray-400'}`}>
-        {change}
-      </span>
-    </div>
-  </div>
-);
+interface DashboardProps {
+  onNavigate?: (tab: AppTab) => void;
+}
 
-const Dashboard: React.FC = () => {
+const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
+  const [total, setTotal] = useState(0);
+  const [withAudio, setWithAudio] = useState(0);
+  const [godCount, setGodCount] = useState(0);
+  const [recent, setRecent] = useState<LibraryItem[]>([]);
+  const [providers, setProviders] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    libraryStats().then((s) => {
+      setTotal(s.total);
+      setWithAudio(s.withAudio);
+      setGodCount(s.god);
+      setRecent(s.recent);
+      setProviders(s.providers);
+    });
+  }, []);
+
+  const pipes = [
+    { label: 'HF token', on: Boolean(getStoredHfToken()) },
+    { label: 'MuAPI', on: Boolean(getMuapiKey()) },
+    { label: 'God Mode', on: getGodModeEnabled() },
+  ];
+
   return (
-    <div className="h-full flex flex-col gap-6 overflow-y-auto p-1">
-      <div className="flex justify-between items-center mb-2">
+    <div className="h-full overflow-y-auto cos-scroll p-1 space-y-6">
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
-            <h2 className="text-2xl font-bold text-white tracking-tight">Command Center</h2>
-            <p className="text-gray-400 text-sm">Prompt → Movie pipeline: <span className="text-green-400">READY on :5173</span></p>
+          <p className="text-[11px] tracking-[0.35em] uppercase text-amber-200/70 mb-2">Command Center</p>
+          <h2 className="cos-display text-4xl md:text-5xl text-[#f7f3ea]">Make the next drop.</h2>
+          <p className="text-[#9aa8bc] mt-2 text-sm">Live library + pipeline status — no fake KPIs.</p>
         </div>
-        <div className="flex space-x-2">
-            <span className="px-3 py-1 rounded-full bg-emerald-900/30 text-emerald-400 border border-emerald-800 text-xs font-mono">HF FREE: READY</span>
-            <span className="px-3 py-1 rounded-full bg-blue-900/30 text-blue-400 border border-blue-800 text-xs font-mono">LTX + MUSICGEN + TTS</span>
-            <span className="px-3 py-1 rounded-full bg-purple-900/30 text-purple-400 border border-purple-800 text-xs font-mono">VEO: OPTIONAL</span>
-        </div>
+        <button
+          type="button"
+          onClick={() => onNavigate?.(AppTab.STUDIO)}
+          className="cos-btn-primary px-6 py-3 rounded-xl self-start"
+        >
+          Open Factory
+        </button>
       </div>
 
-      {/* KPI Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Est. Viral Coefficient" value="1.42" change="+12.5%" trend="up" />
-        <StatCard title="Production Velocity" value="8m 12s" change="-30s" trend="up" />
-        <StatCard title="Model Drift" value="0.03%" change="Stable" trend="neutral" />
-        <StatCard title="Content Variance" value="High" change="Risk: Low" trend="up" />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-grow">
-        {/* Trend Radar */}
-        <div className="lg:col-span-2 bg-gray-800/30 border border-gray-700 rounded-xl p-6">
-          <h3 className="text-white font-bold mb-4 flex items-center">
-            <svg className="w-5 h-5 mr-2 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-            Trend Radar (Real-time)
-          </h3>
-          <div className="space-y-4">
-            {[
-                { topic: "ASMR Unboxing", growth: 94, sentiment: "Positive" },
-                { topic: "AI Tutorials", growth: 88, sentiment: "Neutral" },
-                { topic: "Sustainable Fashion", growth: 76, sentiment: "Positive" },
-                { topic: "Retro Tech", growth: 62, sentiment: "Rising" }
-            ].map((item, i) => (
-                <div key={i} className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg border-l-2 border-cyan-500 hover:bg-gray-700/50 transition cursor-pointer">
-                    <span className="text-gray-200 font-medium">{item.topic}</span>
-                    <div className="flex items-center space-x-4">
-                        <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
-                            <div className="h-full bg-gradient-to-r from-blue-500 to-cyan-400" style={{ width: `${item.growth}%` }}></div>
-                        </div>
-                        <span className="text-cyan-400 font-mono text-sm">{item.growth}%</span>
-                    </div>
-                </div>
-            ))}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {[
+          { k: 'Movies', v: String(total) },
+          { k: 'With sound', v: String(withAudio) },
+          { k: 'God Mode cuts', v: String(godCount) },
+          { k: 'Providers used', v: String(Object.keys(providers).length) },
+        ].map((s) => (
+          <div key={s.k} className="cos-panel rounded-2xl p-4">
+            <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">{s.k}</div>
+            <div className="cos-display text-3xl mt-2 text-amber-200">{s.v}</div>
           </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 cos-panel rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="cos-display text-xl">Recent shelf</h3>
+            <button
+              type="button"
+              className="text-xs text-amber-200/80 hover:underline"
+              onClick={() => onNavigate?.(AppTab.LIBRARY)}
+            >
+              Full library
+            </button>
+          </div>
+          {!recent.length ? (
+            <p className="text-sm text-[#9aa8bc]">No movies yet — hit Factory and cook.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {recent.map((item) => (
+                <div key={item.id} className="flex gap-3 rounded-xl border border-white/5 bg-black/20 p-2">
+                  <div className="w-16 h-24 rounded-lg overflow-hidden bg-black shrink-0">
+                    {item.coverDataUrl || item.videoDataUrl ? (
+                      item.coverDataUrl ? (
+                        <img src={item.coverDataUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <video src={item.videoDataUrl} className="w-full h-full object-cover" muted />
+                      )
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-[9px] text-white/30">
+                        n/a
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 py-1">
+                    <p className="text-sm text-white line-clamp-2">{item.prompt}</p>
+                    <p className="text-[11px] font-mono text-white/40 mt-2">
+                      {item.provider}
+                      {item.godMode ? ' · GOD' : ''}
+                      {item.hasAudio ? ' · audio' : ''}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Quick Actions / System Log */}
-        <div className="bg-gray-800/30 border border-gray-700 rounded-xl p-6 flex flex-col">
-           <h3 className="text-white font-bold mb-4">System Log</h3>
-           <div className="flex-grow space-y-3 text-xs font-mono text-gray-400 overflow-hidden">
-                <div className="flex gap-2"><span className="text-blue-500">10:42:01</span> <span>Batch #492 completed.</span></div>
-                <div className="flex gap-2"><span className="text-blue-500">10:41:55</span> <span>Optimizing thumbnails...</span></div>
-                <div className="flex gap-2"><span className="text-blue-500">10:41:12</span> <span>Veo inference started.</span></div>
-                <div className="flex gap-2"><span className="text-blue-500">10:40:05</span> <span>Hook Foundry: 3 concepts generated.</span></div>
-                <div className="flex gap-2"><span className="text-blue-500">10:39:22</span> <span>Ingesting market signals...</span></div>
-           </div>
-           <button className="mt-4 w-full py-2 border border-gray-600 text-gray-300 hover:text-white hover:border-gray-400 rounded transition text-xs uppercase tracking-wider">
-             View Full Logs
-           </button>
+        <div className="cos-panel rounded-2xl p-5 space-y-4">
+          <h3 className="cos-display text-xl">Pipeline</h3>
+          {pipes.map((p) => (
+            <div key={p.label} className="flex items-center justify-between text-sm">
+              <span className="text-[#9aa8bc]">{p.label}</span>
+              <span className={p.on ? 'text-mintx' : 'text-white/30'}>{p.on ? 'ON' : 'OFF'}</span>
+            </div>
+          ))}
+          <div className="pt-2 border-t border-white/10">
+            <p className="text-[11px] uppercase tracking-[0.2em] text-white/35 mb-2">Top providers</p>
+            {Object.keys(providers).length === 0 ? (
+              <p className="text-xs text-[#9aa8bc]">—</p>
+            ) : (
+              Object.entries(providers)
+                .sort((a, b) => Number(b[1]) - Number(a[1]))
+                .slice(0, 5)
+                .map(([name, count]) => (
+                  <div key={name} className="flex justify-between text-xs text-[#9aa8bc] py-1">
+                    <span>{name}</span>
+                    <span className="font-mono text-amber-200/80">{count}</span>
+                  </div>
+                ))
+            )}
+          </div>
         </div>
       </div>
     </div>

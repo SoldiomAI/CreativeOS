@@ -7,6 +7,7 @@ import { generateImageWithComfy } from '../services/comfyService';
 import { isSpeechDictationSupported, startPromptDictation } from '../services/speechDictation';
 import { getMuapiKey } from '../services/muapiService';
 import { getPreset, PLATFORM_PRESETS, PlatformPresetId } from '../services/socialExport';
+import { getGodModeEnabled, setGodModeEnabled, extractHook } from '../services/godMode';
 import { revokeObjectUrl, safeErrorMessage } from '../services/utils';
 import Spinner from './Spinner';
 import LoadingOverlay from './LoadingOverlay';
@@ -19,7 +20,13 @@ interface VideoCreatorProps {
     prompt: string,
     providerUsed: VideoProvider,
     hasAudio: boolean,
-    meta?: { aspectRatio: string; durationSec: number; hook: string; preset: PlatformPresetId }
+    meta?: {
+      aspectRatio: string;
+      durationSec: number;
+      hook: string;
+      preset: PlatformPresetId;
+      godMode: boolean;
+    }
   ) => void;
 }
 
@@ -42,6 +49,7 @@ const VideoCreator: React.FC<VideoCreatorProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [dictating, setDictating] = useState(false);
   const [interimDictation, setInterimDictation] = useState('');
+  const [godMode, setGodMode] = useState(getGodModeEnabled());
   const stopDictationRef = useRef<(() => void) | null>(null);
   const promptBaseRef = useRef(initialPrompt);
   const canDictate = isSpeechDictationSupported();
@@ -176,24 +184,28 @@ const VideoCreator: React.FC<VideoCreatorProps> = ({
     setIsLoading(true);
     setError(null);
     try {
+      const effectiveHook = hook.trim() || (godMode ? extractHook(prompt) : '');
+      const durationSec = godMode ? Math.max(preset.durationSec, 20) : preset.durationSec;
       const { url, providerUsed, hasAudio } = await generateAnyVideo(
         {
           prompt,
           images,
           provider,
-          soundtrack,
-          voiceover,
+          soundtrack: godMode ? true : soundtrack,
+          voiceover: godMode ? true : voiceover,
           aspectRatio: preset.aspectRatio,
-          durationSec: preset.durationSec,
-          hookOverlay: hook.trim() || undefined,
+          durationSec,
+          hookOverlay: effectiveHook || undefined,
+          godMode,
         },
         setLoadingMessage
       );
       onComplete(url, prompt, providerUsed, hasAudio, {
         aspectRatio: preset.aspectRatio,
-        durationSec: preset.durationSec,
-        hook: hook.trim(),
+        durationSec,
+        hook: effectiveHook,
         preset: presetId,
+        godMode,
       });
     } catch (e: unknown) {
       const message = safeErrorMessage(e, 'Video generation failed');
@@ -235,6 +247,37 @@ const VideoCreator: React.FC<VideoCreatorProps> = ({
               Free + sound
             </span>
           </div>
+
+          <button
+            type="button"
+            data-on={godMode ? 'true' : 'false'}
+            onClick={() => {
+              const next = !godMode;
+              setGodMode(next);
+              setGodModeEnabled(next);
+              if (next) {
+                setSoundtrack(true);
+                setVoiceover(true);
+                if (!hook.trim()) setHook(extractHook(prompt));
+              }
+            }}
+            disabled={isLoading}
+            className="cos-god w-full mb-4 px-4 py-3 rounded-xl text-left transition"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="cos-display text-lg text-amber-100">
+                  {godMode ? 'GOD MODE ON' : 'Enable God Mode'}
+                </div>
+                <p className="text-xs text-white/60 mt-0.5">
+                  Multi-beat movie · auto hook · longer cut · forced audio · amplified prompts
+                </p>
+              </div>
+              <span className="text-[10px] font-mono tracking-widest text-amber-200/80">
+                {godMode ? '1000×' : 'BOOST'}
+              </span>
+            </div>
+          </button>
 
           <div className="flex items-center justify-between gap-2 mb-1">
             <label className="block text-xs font-mono text-gray-500 uppercase">Prompt</label>

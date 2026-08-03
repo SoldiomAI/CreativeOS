@@ -9,6 +9,7 @@ import { generateImageWithComfy, pingComfyUi } from './comfyService';
 import { submitDuixAvatarVideo, synthesizeDuixVoice } from './duixService';
 import { fileToBase64 } from './geminiService';
 import { generateVideoWithMuapi, getMuapiKey, uploadToMuapi } from './muapiService';
+import { amplifyPromptForProviders, buildGodBrief } from './godMode';
 
 const PROVIDER_TIMEOUT_MS = 180_000;
 const MUAPI_TIMEOUT_MS = 360_000;
@@ -103,6 +104,7 @@ type LocalOpts = {
   aspectRatio?: VideoGenerationRequest['aspectRatio'];
   durationSec?: number;
   hookOverlay?: string;
+  godMode?: boolean;
 };
 
 const runComfyMovie = async (
@@ -176,9 +178,11 @@ const runProvider = async (
     aspectRatio: request.aspectRatio || '9:16',
     durationSec: request.durationSec,
     hookOverlay: request.hookOverlay,
+    godMode: request.godMode,
   };
 
   const work = async () => {
+    const providerPrompt = amplifyPromptForProviders(prompt, Boolean(request.godMode));
     switch (provider) {
       case 'local':
         return generateLocalVideo(prompt, images, setLoadingMessage, localOpts);
@@ -187,17 +191,17 @@ const runProvider = async (
       case 'duix':
         return runDuixMovie(prompt, setLoadingMessage);
       case 'muapi':
-        return runMuapiMovie(prompt, images, setLoadingMessage, request);
+        return runMuapiMovie(providerPrompt, images, setLoadingMessage, request);
       case 'veo': {
         if (!images[0]) throw new Error('Veo needs at least one source image');
-        return generateVeoVideo(images[0], prompt, setLoadingMessage);
+        return generateVeoVideo(images[0], providerPrompt, setLoadingMessage);
       }
       case 'ltx':
       case 'animatediff':
       case 'cogvideox':
       case 'wan-space':
       case 'hf-inference':
-        return generateWithHfModel(provider, prompt, images, setLoadingMessage);
+        return generateWithHfModel(provider, providerPrompt, images, setLoadingMessage);
       default:
         throw new Error(`Unsupported provider: ${provider}`);
     }
@@ -265,6 +269,20 @@ export const generateAnyVideo = async (
   const prompt = request.prompt.trim();
   if (!prompt) throw new Error('Enter a prompt describing the movie you want.');
 
+  // God Mode: ensure hook + richer duration defaults for local path
+  if (request.godMode) {
+    const brief = buildGodBrief(prompt, {
+      hook: request.hookOverlay,
+      durationSec: request.durationSec,
+      godMode: true,
+    });
+    if (!request.hookOverlay) request.hookOverlay = brief.hook;
+    if (!request.durationSec) request.durationSec = Math.ceil(brief.totalSeconds);
+    if (!request.aspectRatio) request.aspectRatio = '9:16';
+    request.soundtrack = request.soundtrack !== false;
+    request.voiceover = request.voiceover !== false;
+  }
+
   const images = request.images || [];
   const provider = request.provider || 'auto';
   const wantAudio = request.soundtrack !== false || request.voiceover !== false;
@@ -280,17 +298,26 @@ export const generateAnyVideo = async (
     const hasMuapi = Boolean(getMuapiKey());
     const comfyUp = await pingComfyUi().catch(() => false);
     const chain: Exclude<VideoProvider, 'auto'>[] = [];
-    chain.push('ltx');
-    if (images.length) {
-      if (hasToken) chain.push('hf-inference');
+
+    if (request.godMode) {
+      // God Mode: one fast HF attempt, optional MuAPI, then legendary local multi-beat.
+      chain.push('ltx');
+      if (hasMuapi) chain.push('muapi');
       if (comfyUp) chain.push('comfy');
+      chain.push('local');
     } else {
-      chain.push('cogvideox');
-      if (comfyUp) chain.push('comfy');
-      else chain.push('wan-space');
+      chain.push('ltx');
+      if (images.length) {
+        if (hasToken) chain.push('hf-inference');
+        if (comfyUp) chain.push('comfy');
+      } else {
+        chain.push('cogvideox');
+        if (comfyUp) chain.push('comfy');
+        else chain.push('wan-space');
+      }
+      if (hasMuapi) chain.push('muapi');
+      chain.push('local');
     }
-    if (hasMuapi) chain.push('muapi');
-    chain.push('local');
 
     const errors: string[] = [];
     let produced: string | null = null;

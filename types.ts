@@ -42,11 +42,14 @@ export interface VideoGenerationRequest {
   durationSec?: number;
   /** Opening hook text burned into local compositor frames. */
   hookOverlay?: string;
+  /** Amplify multi-beat local composition + stronger provider prompts. */
+  godMode?: boolean;
 }
 
 export enum AppTab {
   DASHBOARD = 'DASHBOARD',
   STUDIO = 'STUDIO',
+  STILLS = 'STILLS',
   LIBRARY = 'LIBRARY',
   SETTINGS = 'SETTINGS',
 }

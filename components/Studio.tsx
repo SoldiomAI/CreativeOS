@@ -8,6 +8,7 @@ import {
   downloadSocialExportPack,
   formatCaptionWithTags,
 } from '../services/socialExport';
+import { captureVideoCover, downloadCover } from '../services/coverFrame';
 import { revokeObjectUrl } from '../services/utils';
 import VideoCreator from './VideoCreator';
 import Spinner from './Spinner';
@@ -41,6 +42,8 @@ const Studio: React.FC = () => {
   const [savedNote, setSavedNote] = useState<string | null>(null);
   const [copyNote, setCopyNote] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [usedGodMode, setUsedGodMode] = useState(false);
 
   const [socialCampaign, setSocialCampaign] = useState<SocialCampaign | null>(null);
   const [isGeneratingSocial, setIsGeneratingSocial] = useState(false);
@@ -91,9 +94,10 @@ const Studio: React.FC = () => {
     prompt: string,
     used: VideoProvider,
     audio: boolean,
-    meta?: { aspectRatio: string; durationSec: number; hook: string }
+    meta?: { aspectRatio: string; durationSec: number; hook: string; godMode?: boolean }
   ) => {
     revokeObjectUrl(videoUrl);
+    revokeObjectUrl(coverUrl);
     setVideoUrl(url);
     setUsedPrompt(prompt);
     setUsedHook(meta?.hook || seedHook || selectedConcept?.hook || '');
@@ -101,13 +105,61 @@ const Studio: React.FC = () => {
     setDurationSec(meta?.durationSec || 15);
     setProviderUsed(used);
     setHasAudio(audio);
+    setUsedGodMode(Boolean(meta?.godMode));
     setStep('result');
     setSavedNote(null);
+
+    let coverDataUrl: string | undefined;
     try {
-      await addToLibrary(prompt, used, url, audio);
-      setSavedNote('Saved to Asset Library');
+      const cover = await captureVideoCover(url, 0.8);
+      setCoverUrl(cover.url);
+      coverDataUrl = await fetch(cover.url)
+        .then((r) => r.blob())
+        .then(
+          (blob) =>
+            new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(String(reader.result));
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            })
+        );
     } catch {
-      setSavedNote('Created — library save skipped (storage full)');
+      setCoverUrl(null);
+    }
+
+    try {
+      await addToLibrary(prompt, used, url, audio, {
+        hook: meta?.hook || seedHook,
+        aspectRatio: meta?.aspectRatio,
+        durationSec: meta?.durationSec,
+        coverDataUrl,
+        godMode: meta?.godMode,
+      });
+      setSavedNote('Saved to Asset Library (IndexedDB)');
+    } catch {
+      setSavedNote('Created — library save skipped');
+    }
+
+    if (meta?.godMode) {
+      const hookForSocial = meta?.hook || seedHook || selectedConcept?.hook || prompt.slice(0, 120);
+      window.setTimeout(async () => {
+        setStep('distribute');
+        setIsGeneratingSocial(true);
+        setError(null);
+        try {
+          const campaign = await generateSocialMetadata(
+            topic || prompt.slice(0, 80),
+            hookForSocial,
+            selectedConcept?.visualDescription || prompt
+          );
+          setSocialCampaign(campaign);
+        } catch {
+          setSocialCampaign(buildFallbackCampaign(prompt, hookForSocial));
+        } finally {
+          setIsGeneratingSocial(false);
+        }
+      }, 350);
     }
   };
 
@@ -177,13 +229,16 @@ const Studio: React.FC = () => {
 
   const reset = () => {
     revokeObjectUrl(videoUrl);
+    revokeObjectUrl(coverUrl);
     setStep('produce');
     setMode('create');
     setVideoUrl(null);
+    setCoverUrl(null);
     setUsedPrompt('');
     setUsedHook('');
     setProviderUsed(null);
     setHasAudio(false);
+    setUsedGodMode(false);
     setSavedNote(null);
     setConcepts([]);
     setTopic('');
@@ -200,18 +255,21 @@ const Studio: React.FC = () => {
 
   if (step === 'result' && videoUrl) {
     return (
-      <div className="h-full flex flex-col items-center justify-center animate-fade-in">
-        <div className="max-w-md w-full bg-gray-800/50 border border-gray-700 rounded-2xl p-6 shadow-2xl">
-          <h2 className="text-2xl font-bold text-white mb-2 text-center">Movie Ready</h2>
-          <p className="text-center text-xs font-mono text-cyan-400 mb-1">
+      <div className="h-full flex flex-col items-center justify-center cos-rise">
+        <div className="max-w-md w-full cos-panel rounded-2xl p-6 shadow-2xl">
+          <h2 className="cos-display text-3xl text-white mb-2 text-center">
+            {usedGodMode ? 'God Mode Cut Ready' : 'Movie Ready'}
+          </h2>
+          <p className="text-center text-xs font-mono text-amber-200/80 mb-1">
             Provider: {providerUsed || 'unknown'}
             {hasAudio ? ' · with sound' : ''} · {aspectRatio} · ~{durationSec}s
+            {usedGodMode ? ' · GOD' : ''}
           </p>
           {savedNote && (
-            <p className="text-center text-[11px] text-emerald-400 mb-3">{savedNote}</p>
+            <p className="text-center text-[11px] text-mintx mb-3">{savedNote}</p>
           )}
           <div
-            className={`bg-black rounded-lg overflow-hidden mb-6 ring-4 ring-gray-700 mx-auto ${
+            className={`bg-black rounded-lg overflow-hidden mb-4 ring-1 ring-amber-500/20 mx-auto ${
               aspectRatio === '16:9'
                 ? 'aspect-video w-full'
                 : aspectRatio === '1:1'
@@ -221,23 +279,38 @@ const Studio: React.FC = () => {
           >
             <video src={videoUrl} controls autoPlay loop className="w-full h-full object-cover" />
           </div>
+          {coverUrl && (
+            <div className="flex items-center gap-3 mb-4">
+              <img src={coverUrl} alt="Cover" className="w-14 h-20 object-cover rounded border border-white/10" />
+              <button
+                type="button"
+                className="text-xs text-amber-200 hover:underline"
+                onClick={async () => {
+                  const blob = await fetch(coverUrl).then((r) => r.blob());
+                  downloadCover(blob);
+                }}
+              >
+                Download cover frame
+              </button>
+            </div>
+          )}
           <a
             href={videoUrl}
             download="creativeos-movie.webm"
-            className="block text-center mb-4 text-sm text-cyan-400 hover:underline"
+            className="block text-center mb-4 text-sm text-amber-200 hover:underline"
           >
             Download movie
           </a>
           <div className="grid grid-cols-2 gap-4">
             <button
               onClick={reset}
-              className="py-3 rounded-lg border border-gray-600 text-gray-300 hover:text-white font-medium"
+              className="py-3 rounded-xl cos-btn-ghost font-medium"
             >
               New Project
             </button>
             <button
               onClick={handleStartDistribution}
-              className="py-3 rounded-lg bg-green-600 hover:bg-green-500 text-white font-bold shadow-lg shadow-green-900/20"
+              className="py-3 rounded-xl cos-btn-primary"
             >
               Captions + Export
             </button>

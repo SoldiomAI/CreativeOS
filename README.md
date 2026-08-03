@@ -57,6 +57,17 @@ npm run typecheck
 npm run build
 ```
 
+## God Mode
+
+Toggle **God Mode** in Factory Studio for a 1000× short-form cut:
+
+- Multi-beat local compositor (title card → beats → end CTA)
+- Auto hook extraction + safe-zone burn-in
+- Forced soundtrack + voiceover, amplified provider prompts
+- Longer vertical duration, cover-frame capture
+- Auto-opens Caption Studio for export pack
+- Library persists in **IndexedDB** (covers + metadata)
+
 ## Factory Studio
 
 1. Open **Prompt → Movie** (or Hook Foundry → send a concept)

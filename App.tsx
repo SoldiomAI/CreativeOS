@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import Studio from './components/Studio';
 import Library from './components/Library';
+import EditorTool from './components/EditorTool';
 import { getStoredHfToken, setStoredHfToken } from './services/hfVideoService';
 import {
   getComfyCheckpoint,
@@ -58,29 +59,18 @@ export default function App() {
   }, [activeTab, comfyUrl]);
 
   if (!hasStarted) {
-    return (
-      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop')] bg-cover bg-center">
-        <div className="absolute inset-0 bg-gray-900/90 backdrop-blur-sm"></div>
-        <div className="relative z-10 w-full h-full">
-          <LandingPage onGetStarted={() => setHasStarted(true)} />
-        </div>
-      </div>
-    );
+    return <LandingPage onGetStarted={() => setHasStarted(true)} />;
   }
 
   return (
-    <div className="flex h-screen bg-gray-900 text-white overflow-hidden font-sans">
+    <div className="flex h-screen cos-app-shell text-white overflow-hidden font-body">
       <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
-      <main className="flex-grow p-4 md:p-6 overflow-hidden relative">
-        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0 opacity-20">
-          <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-blue-600/30 rounded-full blur-[120px]"></div>
-          <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-cyan-600/20 rounded-full blur-[120px]"></div>
-        </div>
-
+      <main className="flex-grow p-4 md:p-6 overflow-hidden relative cos-grain">
         <div className="relative z-10 h-full">
-          {activeTab === AppTab.DASHBOARD && <Dashboard />}
+          {activeTab === AppTab.DASHBOARD && <Dashboard onNavigate={setActiveTab} />}
           {activeTab === AppTab.STUDIO && <Studio />}
+          {activeTab === AppTab.STILLS && <EditorTool />}
           {activeTab === AppTab.LIBRARY && <Library />}
           {activeTab === AppTab.SETTINGS && (
             <div className="max-w-2xl mx-auto h-full overflow-y-auto flex flex-col gap-6 p-4 pb-10">

@@ -4,20 +4,28 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Creative OS — Prompt → Movie</title>
+    <meta name="description" content="Creative OS — prompt to movie with sound, social export, God Mode." />
+    <title>Creative OS</title>
     <script src="https://cdn.tailwindcss.com"></script>
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.1"
-  }
-}
-</script>
-</head>
-  <body class="bg-gray-900">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              display: ['Syne', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+              body: ['Outfit', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+            },
+            colors: {
+              ink: '#070b12',
+              amberx: '#f0b429',
+              mintx: '#5dffc2',
+            },
+          },
+        },
+      };
+    </script>
+  </head>
+  <body class="bg-ink text-white font-body">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>
