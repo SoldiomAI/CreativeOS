@@ -8,8 +8,10 @@ import { withTimeout } from './utils';
 import { generateImageWithComfy, pingComfyUi } from './comfyService';
 import { submitDuixAvatarVideo, synthesizeDuixVoice } from './duixService';
 import { fileToBase64 } from './geminiService';
+import { generateVideoWithMuapi, getMuapiKey, uploadToMuapi } from './muapiService';
 
 const PROVIDER_TIMEOUT_MS = 180_000;
+const MUAPI_TIMEOUT_MS = 360_000;
 
 export const VIDEO_PROVIDERS: {
   id: VideoProvider;
@@ -82,6 +84,13 @@ export const VIDEO_PROVIDERS: {
     needsImage: false,
   },
   {
+    id: 'muapi',
+    label: 'MuAPI (Open Generative AI)',
+    blurb: 'github.com/Anil-matcha/Open-Generative-AI — Seedance/Wan via MuAPI key',
+    free: false,
+    needsImage: false,
+  },
+  {
     id: 'veo',
     label: 'Gemini Veo 3.1',
     blurb: 'Premium Google video — requires Gemini key',
@@ -90,10 +99,17 @@ export const VIDEO_PROVIDERS: {
   },
 ];
 
+type LocalOpts = {
+  aspectRatio?: VideoGenerationRequest['aspectRatio'];
+  durationSec?: number;
+  hookOverlay?: string;
+};
+
 const runComfyMovie = async (
   prompt: string,
   images: ImageFile[],
-  setLoadingMessage: (m: string) => void
+  setLoadingMessage: (m: string) => void,
+  localOpts: LocalOpts
 ): Promise<string> => {
   let sourceImages = images;
   if (!sourceImages.length) {
@@ -112,7 +128,7 @@ const runComfyMovie = async (
       },
     ];
   }
-  return generateLocalVideo(prompt, sourceImages, setLoadingMessage);
+  return generateLocalVideo(prompt, sourceImages, setLoadingMessage, localOpts);
 };
 
 const runDuixMovie = async (
@@ -123,20 +139,55 @@ const runDuixMovie = async (
   return submitDuixAvatarVideo(audioPath, setLoadingMessage);
 };
 
+const runMuapiMovie = async (
+  prompt: string,
+  images: ImageFile[],
+  setLoadingMessage: (m: string) => void,
+  request: VideoGenerationRequest
+): Promise<string> => {
+  let imageUrl: string | undefined;
+  if (images[0]) {
+    setLoadingMessage('Uploading reference image to MuAPI…');
+    const blob = await fetch(images[0].url).then((r) => r.blob());
+    imageUrl = await uploadToMuapi(blob, images[0].name || 'frame.jpg');
+  }
+  // MuAPI durations are typically 5 / 10 / 15
+  const durationSec = Math.min(15, Math.max(5, Math.round(request.durationSec || 5)));
+  const snapped = durationSec <= 5 ? 5 : durationSec <= 10 ? 10 : 15;
+  return generateVideoWithMuapi(
+    {
+      prompt,
+      aspectRatio: request.aspectRatio || '9:16',
+      durationSec: snapped,
+      imageUrl,
+    },
+    setLoadingMessage
+  );
+};
+
 const runProvider = async (
   provider: Exclude<VideoProvider, 'auto'>,
   prompt: string,
   images: ImageFile[],
-  setLoadingMessage: (m: string) => void
+  setLoadingMessage: (m: string) => void,
+  request: VideoGenerationRequest
 ): Promise<string> => {
+  const localOpts: LocalOpts = {
+    aspectRatio: request.aspectRatio || '9:16',
+    durationSec: request.durationSec,
+    hookOverlay: request.hookOverlay,
+  };
+
   const work = async () => {
     switch (provider) {
       case 'local':
-        return generateLocalVideo(prompt, images, setLoadingMessage);
+        return generateLocalVideo(prompt, images, setLoadingMessage, localOpts);
       case 'comfy':
-        return runComfyMovie(prompt, images, setLoadingMessage);
+        return runComfyMovie(prompt, images, setLoadingMessage, localOpts);
       case 'duix':
         return runDuixMovie(prompt, setLoadingMessage);
+      case 'muapi':
+        return runMuapiMovie(prompt, images, setLoadingMessage, request);
       case 'veo': {
         if (!images[0]) throw new Error('Veo needs at least one source image');
         return generateVeoVideo(images[0], prompt, setLoadingMessage);
@@ -152,7 +203,8 @@ const runProvider = async (
     }
   };
 
-  return withTimeout(work(), PROVIDER_TIMEOUT_MS, provider);
+  const timeout = provider === 'muapi' ? MUAPI_TIMEOUT_MS : PROVIDER_TIMEOUT_MS;
+  return withTimeout(work(), timeout, provider);
 };
 
 const withSoundtrack = async (
@@ -162,7 +214,7 @@ const withSoundtrack = async (
   providerUsed: VideoProvider,
   setLoadingMessage: (m: string) => void
 ): Promise<string> => {
-  // Duix.Avatar already ships lip-synced speech; skip extra mix.
+  // Duix / MuAPI often already include audio; still allow optional mix when requested.
   if (providerUsed === 'duix') return videoUrl;
 
   const wantMusic = request.soundtrack !== false;
@@ -173,7 +225,10 @@ const withSoundtrack = async (
     (providerUsed === 'local' || providerUsed === 'comfy') && wantMusic;
   if (localAlreadyScored && !wantVoice) return videoUrl;
 
-  const durationSec = await estimateVideoDuration(videoUrl, 6);
+  // MuAPI videos often have native audio — keep it when muxing voice/music.
+  const keepOriginal = localAlreadyScored || providerUsed === 'muapi';
+
+  const durationSec = await estimateVideoDuration(videoUrl, request.durationSec || 6);
   const tracks = await generateMovieAudio(
     prompt,
     durationSec,
@@ -190,7 +245,7 @@ const withSoundtrack = async (
     return await muxVideoWithAudio(videoUrl, tracks, setLoadingMessage, {
       musicGain: tracks.some((t) => t.kind === 'voice') ? 0.42 : 0.7,
       voiceGain: 1,
-      keepOriginalAudio: localAlreadyScored,
+      keepOriginalAudio: keepOriginal,
     });
   } catch (e) {
     setLoadingMessage('Audio mix failed — returning video without extra mix');
@@ -218,20 +273,24 @@ export const generateAnyVideo = async (
   let providerUsed: VideoProvider;
 
   if (provider !== 'auto') {
-    url = await runProvider(provider, prompt, images, setLoadingMessage);
+    url = await runProvider(provider, prompt, images, setLoadingMessage, request);
     providerUsed = provider;
   } else {
     const hasToken = Boolean(getStoredHfToken() || process.env.HF_TOKEN);
+    const hasMuapi = Boolean(getMuapiKey());
     const comfyUp = await pingComfyUi().catch(() => false);
-    const chain: Exclude<VideoProvider, 'auto'>[] = images.length
-      ? hasToken
-        ? ['ltx', 'hf-inference', 'local']
-        : comfyUp
-          ? ['ltx', 'comfy', 'local']
-          : ['ltx', 'local']
-      : comfyUp
-        ? ['ltx', 'cogvideox', 'comfy', 'local']
-        : ['ltx', 'cogvideox', 'wan-space', 'local'];
+    const chain: Exclude<VideoProvider, 'auto'>[] = [];
+    chain.push('ltx');
+    if (images.length) {
+      if (hasToken) chain.push('hf-inference');
+      if (comfyUp) chain.push('comfy');
+    } else {
+      chain.push('cogvideox');
+      if (comfyUp) chain.push('comfy');
+      else chain.push('wan-space');
+    }
+    if (hasMuapi) chain.push('muapi');
+    chain.push('local');
 
     const errors: string[] = [];
     let produced: string | null = null;
@@ -239,7 +298,7 @@ export const generateAnyVideo = async (
     for (const candidate of chain) {
       try {
         setLoadingMessage(`Trying ${candidate}…`);
-        produced = await runProvider(candidate, prompt, images, setLoadingMessage);
+        produced = await runProvider(candidate, prompt, images, setLoadingMessage, request);
         used = candidate;
         break;
       } catch (e: unknown) {
@@ -258,6 +317,7 @@ export const generateAnyVideo = async (
   const mixed = await withSoundtrack(url, prompt, request, providerUsed, setLoadingMessage);
   const hasAudio =
     providerUsed === 'duix' ||
+    providerUsed === 'muapi' ||
     (wantAudio &&
       (providerUsed === 'local' ||
         providerUsed === 'comfy' ||

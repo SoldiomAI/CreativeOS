@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
-import { CreativeConcept, SocialCampaign, VideoProvider } from '../types';
+import { CreativeConcept, SocialCampaign, SocialMetadata, VideoProvider } from '../types';
 import { generateCreativeConcepts, generateSocialMetadata } from '../services/geminiService';
 import { addToLibrary } from '../services/libraryStore';
+import {
+  buildFallbackCampaign,
+  copyToClipboard,
+  downloadSocialExportPack,
+  formatCaptionWithTags,
+} from '../services/socialExport';
 import { revokeObjectUrl } from '../services/utils';
 import VideoCreator from './VideoCreator';
 import Spinner from './Spinner';
@@ -23,12 +29,18 @@ const Studio: React.FC = () => {
   const [selectedConcept, setSelectedConcept] = useState<CreativeConcept | null>(null);
   const [isGeneratingConcepts, setIsGeneratingConcepts] = useState(false);
   const [seedPrompt, setSeedPrompt] = useState('');
+  const [seedHook, setSeedHook] = useState('');
 
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [usedPrompt, setUsedPrompt] = useState('');
+  const [usedHook, setUsedHook] = useState('');
+  const [aspectRatio, setAspectRatio] = useState('9:16');
+  const [durationSec, setDurationSec] = useState(15);
   const [providerUsed, setProviderUsed] = useState<VideoProvider | null>(null);
   const [hasAudio, setHasAudio] = useState(false);
   const [savedNote, setSavedNote] = useState<string | null>(null);
+  const [copyNote, setCopyNote] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const [socialCampaign, setSocialCampaign] = useState<SocialCampaign | null>(null);
   const [isGeneratingSocial, setIsGeneratingSocial] = useState(false);
@@ -44,6 +56,13 @@ const Studio: React.FC = () => {
   const [isPublishing, setIsPublishing] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const updatePlatform = (key: keyof SocialCampaign, patch: Partial<SocialMetadata>) => {
+    setSocialCampaign((prev) => {
+      if (!prev) return prev;
+      return { ...prev, [key]: { ...prev[key], ...patch } };
+    });
+  };
 
   const handleGenerateConcepts = async () => {
     if (!topic) return;
@@ -62,6 +81,7 @@ const Studio: React.FC = () => {
   const handleSelectConcept = (concept: CreativeConcept) => {
     setSelectedConcept(concept);
     setSeedPrompt(concept.visualDescription);
+    setSeedHook(concept.hook);
     setMode('create');
     setStep('produce');
   };
@@ -70,11 +90,15 @@ const Studio: React.FC = () => {
     url: string,
     prompt: string,
     used: VideoProvider,
-    audio: boolean
+    audio: boolean,
+    meta?: { aspectRatio: string; durationSec: number; hook: string }
   ) => {
     revokeObjectUrl(videoUrl);
     setVideoUrl(url);
     setUsedPrompt(prompt);
+    setUsedHook(meta?.hook || seedHook || selectedConcept?.hook || '');
+    setAspectRatio(meta?.aspectRatio || '9:16');
+    setDurationSec(meta?.durationSec || 15);
     setProviderUsed(used);
     setHasAudio(audio);
     setStep('result');
@@ -94,19 +118,46 @@ const Studio: React.FC = () => {
     try {
       const campaign = await generateSocialMetadata(
         topic || usedPrompt.slice(0, 80),
-        selectedConcept?.hook || usedPrompt.slice(0, 120),
+        usedHook || selectedConcept?.hook || usedPrompt.slice(0, 120),
         selectedConcept?.visualDescription || usedPrompt
       );
       setSocialCampaign(campaign);
     } catch {
-      setSocialCampaign({
-        youtube: { caption: usedPrompt, hashtags: ['shorts', 'ai'] },
-        instagram: { caption: usedPrompt, hashtags: ['reels', 'creative'] },
-        tiktok: { caption: usedPrompt, hashtags: ['fyp', 'ai'] },
-      });
-      setError('Could not AI-generate captions — using prompt fallbacks.');
+      setSocialCampaign(buildFallbackCampaign(usedPrompt, usedHook || selectedConcept?.hook));
+      setError('Could not AI-generate captions — using marketing-style fallbacks.');
     } finally {
       setIsGeneratingSocial(false);
+    }
+  };
+
+  const handleCopyPlatform = async (key: keyof SocialCampaign) => {
+    if (!socialCampaign) return;
+    const ok = await copyToClipboard(formatCaptionWithTags(socialCampaign[key]));
+    setCopyNote(ok ? `Copied ${key} caption` : 'Clipboard unavailable');
+    setTimeout(() => setCopyNote(null), 2000);
+  };
+
+  const handleExportPack = async () => {
+    if (!videoUrl || !socialCampaign) return;
+    setExporting(true);
+    setError(null);
+    try {
+      await downloadSocialExportPack({
+        videoUrl,
+        prompt: usedPrompt,
+        campaign: socialCampaign,
+        hook: usedHook,
+        provider: providerUsed || undefined,
+        scheduledFor: `${scheduleDate} ${scheduleTime}`,
+        aspectRatio,
+        durationSec,
+      });
+      setCopyNote('Export pack downloaded (video + captions.txt + pack.json)');
+      setTimeout(() => setCopyNote(null), 3000);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Export pack failed');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -130,6 +181,7 @@ const Studio: React.FC = () => {
     setMode('create');
     setVideoUrl(null);
     setUsedPrompt('');
+    setUsedHook('');
     setProviderUsed(null);
     setHasAudio(false);
     setSavedNote(null);
@@ -137,11 +189,13 @@ const Studio: React.FC = () => {
     setTopic('');
     setSelectedConcept(null);
     setSeedPrompt('');
+    setSeedHook('');
     setSocialCampaign(null);
     setPlatformStatuses({ youtube: 'idle', instagram: 'idle', tiktok: 'idle' });
     setIsPublished(false);
     setIsPublishing(false);
     setError(null);
+    setCopyNote(null);
   };
 
   if (step === 'result' && videoUrl) {
@@ -151,12 +205,20 @@ const Studio: React.FC = () => {
           <h2 className="text-2xl font-bold text-white mb-2 text-center">Movie Ready</h2>
           <p className="text-center text-xs font-mono text-cyan-400 mb-1">
             Provider: {providerUsed || 'unknown'}
-            {hasAudio ? ' · with sound' : ''}
+            {hasAudio ? ' · with sound' : ''} · {aspectRatio} · ~{durationSec}s
           </p>
           {savedNote && (
             <p className="text-center text-[11px] text-emerald-400 mb-3">{savedNote}</p>
           )}
-          <div className="aspect-[9/16] bg-black rounded-lg overflow-hidden mb-6 ring-4 ring-gray-700">
+          <div
+            className={`bg-black rounded-lg overflow-hidden mb-6 ring-4 ring-gray-700 mx-auto ${
+              aspectRatio === '16:9'
+                ? 'aspect-video w-full'
+                : aspectRatio === '1:1'
+                  ? 'aspect-square max-w-sm'
+                  : 'aspect-[9/16] max-w-sm'
+            }`}
+          >
             <video src={videoUrl} controls autoPlay loop className="w-full h-full object-cover" />
           </div>
           <a
@@ -177,7 +239,7 @@ const Studio: React.FC = () => {
               onClick={handleStartDistribution}
               className="py-3 rounded-lg bg-green-600 hover:bg-green-500 text-white font-bold shadow-lg shadow-green-900/20"
             >
-              Captions
+              Captions + Export
             </button>
           </div>
         </div>
@@ -205,7 +267,16 @@ const Studio: React.FC = () => {
           </div>
           <h2 className="text-3xl font-bold text-white mb-2">Demo Schedule Complete</h2>
           <p className="text-gray-400 mb-2 text-sm">
-            Preview only — no real posts were published.
+            Preview only — no real posts were published. Use Export Pack or a scheduler like{' '}
+            <a
+              className="text-cyan-400 underline"
+              href="https://github.com/Anil-matcha/Free-AI-Social-Media-Scheduler"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Free-AI-Social-Media-Scheduler
+            </a>
+            .
           </p>
           <p className="text-gray-500 mb-8 font-mono text-xs">
             {scheduleDate} @ {scheduleTime}
@@ -227,6 +298,11 @@ const Studio: React.FC = () => {
             {error}
           </div>
         )}
+        {copyNote && (
+          <div className="mb-3 bg-emerald-900/20 border border-emerald-800 p-3 rounded text-emerald-200 text-sm">
+            {copyNote}
+          </div>
+        )}
         <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6 bg-gray-800/50 p-4 rounded-xl border border-gray-700">
           <div>
             <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -236,7 +312,7 @@ const Studio: React.FC = () => {
               </span>
             </h2>
             <p className="text-gray-400 text-sm">
-              Edit captions locally. Launch simulates a schedule — it does not post.
+              Edit captions, copy per platform, or download an export pack. Schedule is simulated.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -254,6 +330,13 @@ const Studio: React.FC = () => {
                 className="bg-transparent text-white text-sm outline-none"
               />
             </div>
+            <button
+              onClick={handleExportPack}
+              disabled={exporting || !socialCampaign}
+              className="bg-cyan-700 hover:bg-cyan-600 disabled:bg-gray-600 text-white font-bold px-4 py-2 rounded-lg text-sm"
+            >
+              {exporting ? 'Exporting…' : 'Download Export Pack'}
+            </button>
             <button
               onClick={handlePublish}
               disabled={isPublishing}
@@ -288,12 +371,20 @@ const Studio: React.FC = () => {
                   )}
                 </div>
               )}
-              <div className="p-4 border-b border-gray-800">
+              <div className="p-4 border-b border-gray-800 flex items-center justify-between gap-2">
                 <h3 className="font-bold text-white">{title}</h3>
+                <button
+                  type="button"
+                  onClick={() => handleCopyPlatform(key)}
+                  className="text-xs text-cyan-400 hover:underline"
+                >
+                  Copy
+                </button>
               </div>
               <div className="p-4 space-y-3">
                 <textarea
-                  defaultValue={socialCampaign?.[key]?.caption || usedPrompt}
+                  value={socialCampaign?.[key]?.caption || ''}
+                  onChange={(e) => updatePlatform(key, { caption: e.target.value })}
                   className="w-full h-28 bg-gray-800 border border-gray-700 rounded p-3 text-sm text-gray-300 outline-none resize-none"
                 />
                 <div className="flex flex-wrap gap-2">
@@ -307,6 +398,38 @@ const Studio: React.FC = () => {
             </div>
           ))}
         </div>
+
+        <p className="text-[11px] text-gray-500 mt-2 pb-2">
+          Real posting:{' '}
+          <a
+            className="text-cyan-400 underline"
+            href="https://github.com/Anil-matcha/Free-AI-Social-Media-Scheduler"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Social Media Scheduler
+          </a>
+          {' · '}
+          Long→shorts:{' '}
+          <a
+            className="text-cyan-400 underline"
+            href="https://github.com/SamurAIGPT/AI-Youtube-Shorts-Generator"
+            target="_blank"
+            rel="noreferrer"
+          >
+            AI YouTube Shorts Generator
+          </a>
+          {' · '}
+          Multi-model studio:{' '}
+          <a
+            className="text-cyan-400 underline"
+            href="https://github.com/Anil-matcha/Open-Generative-AI"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open Generative AI
+          </a>
+        </p>
       </div>
     );
   }
@@ -345,8 +468,9 @@ const Studio: React.FC = () => {
       {mode === 'create' ? (
         <div className="flex-grow min-h-0">
           <VideoCreator
-            key={seedPrompt}
+            key={`${seedPrompt}|${seedHook}`}
             initialPrompt={seedPrompt}
+            initialHook={seedHook}
             onComplete={handleVideoComplete}
           />
         </div>
@@ -355,7 +479,7 @@ const Studio: React.FC = () => {
           <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
             <h2 className="text-xl font-bold text-white mb-2">Hook Foundry</h2>
             <p className="text-gray-400 text-sm mb-4">
-              Generate viral concepts, then send one into Prompt → Movie.
+              Generate viral concepts, then send one into Prompt → Movie (hook + visual prompt).
             </p>
             <div className="flex gap-2">
               <input

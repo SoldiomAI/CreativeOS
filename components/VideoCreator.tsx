@@ -5,22 +5,32 @@ import { generateAnyVideo, VIDEO_PROVIDERS } from '../services/videoEngine';
 import { getStoredHfToken, setStoredHfToken } from '../services/hfVideoService';
 import { generateImageWithComfy } from '../services/comfyService';
 import { isSpeechDictationSupported, startPromptDictation } from '../services/speechDictation';
+import { getMuapiKey } from '../services/muapiService';
+import { getPreset, PLATFORM_PRESETS, PlatformPresetId } from '../services/socialExport';
 import { revokeObjectUrl, safeErrorMessage } from '../services/utils';
 import Spinner from './Spinner';
 import LoadingOverlay from './LoadingOverlay';
 
 interface VideoCreatorProps {
   initialPrompt?: string;
+  initialHook?: string;
   onComplete: (
     videoUrl: string,
     prompt: string,
     providerUsed: VideoProvider,
-    hasAudio: boolean
+    hasAudio: boolean,
+    meta?: { aspectRatio: string; durationSec: number; hook: string; preset: PlatformPresetId }
   ) => void;
 }
 
-const VideoCreator: React.FC<VideoCreatorProps> = ({ initialPrompt = '', onComplete }) => {
+const VideoCreator: React.FC<VideoCreatorProps> = ({
+  initialPrompt = '',
+  initialHook = '',
+  onComplete,
+}) => {
   const [prompt, setPrompt] = useState(initialPrompt);
+  const [hook, setHook] = useState(initialHook);
+  const [presetId, setPresetId] = useState<PlatformPresetId>('tiktok');
   const [images, setImages] = useState<ImageFile[]>([]);
   const [provider, setProvider] = useState<VideoProvider>('auto');
   const [hfToken, setHfToken] = useState(getStoredHfToken());
@@ -35,6 +45,7 @@ const VideoCreator: React.FC<VideoCreatorProps> = ({ initialPrompt = '', onCompl
   const stopDictationRef = useRef<(() => void) | null>(null);
   const promptBaseRef = useRef(initialPrompt);
   const canDictate = isSpeechDictationSupported();
+  const preset = getPreset(presetId);
 
   useEffect(() => {
     return () => {
@@ -157,20 +168,40 @@ const VideoCreator: React.FC<VideoCreatorProps> = ({ initialPrompt = '', onCompl
       return;
     }
     if (hfToken.trim()) setStoredHfToken(hfToken);
+    if (provider === 'muapi' && !getMuapiKey()) {
+      setError('MuAPI needs a key in Optimization / Connections (muapi.ai).');
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
     try {
       const { url, providerUsed, hasAudio } = await generateAnyVideo(
-        { prompt, images, provider, soundtrack, voiceover },
+        {
+          prompt,
+          images,
+          provider,
+          soundtrack,
+          voiceover,
+          aspectRatio: preset.aspectRatio,
+          durationSec: preset.durationSec,
+          hookOverlay: hook.trim() || undefined,
+        },
         setLoadingMessage
       );
-      onComplete(url, prompt, providerUsed, hasAudio);
+      onComplete(url, prompt, providerUsed, hasAudio, {
+        aspectRatio: preset.aspectRatio,
+        durationSec: preset.durationSec,
+        hook: hook.trim(),
+        preset: presetId,
+      });
     } catch (e: unknown) {
       const message = safeErrorMessage(e, 'Video generation failed');
       if (message.includes('HF_TOKEN_REQUIRED')) {
         setShowToken(true);
         setError('This provider needs a free Hugging Face token. Paste it below, then retry.');
+      } else if (message.includes('MUAPI_KEY_REQUIRED') || message.includes('MUAPI_KEY_INVALID')) {
+        setError('MuAPI key missing or invalid. Add it under Optimization (see Open Generative AI / muapi.ai).');
       } else if (message === 'API_KEY_REQUIRED' || message === 'API_KEY_INVALID') {
         setError('Gemini Veo needs a valid API key. Pick a free HF/local provider instead, or select a key.');
       } else {
@@ -248,6 +279,39 @@ const VideoCreator: React.FC<VideoCreatorProps> = ({ initialPrompt = '', onCompl
               </a>
             </p>
           )}
+
+          <label className="block text-xs font-mono text-gray-500 mt-3 mb-1 uppercase">
+            Opening hook (burned into local / Comfy movies)
+          </label>
+          <input
+            value={hook}
+            onChange={(e) => setHook(e.target.value)}
+            placeholder="e.g. Wait for the neon rain drop…"
+            className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-cyan-500"
+            disabled={isLoading}
+          />
+
+          <label className="block text-xs font-mono text-gray-500 mt-3 mb-2 uppercase">
+            Platform preset
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {PLATFORM_PRESETS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setPresetId(p.id)}
+                disabled={isLoading}
+                className={`px-3 py-1.5 rounded-lg border text-xs transition ${
+                  presetId === p.id
+                    ? 'border-cyan-500 bg-cyan-900/30 text-cyan-200'
+                    : 'border-gray-700 text-gray-400 hover:border-gray-500'
+                }`}
+              >
+                <span className="font-semibold">{p.label}</span>
+                <span className="ml-1 opacity-70">{p.blurb}</span>
+              </button>
+            ))}
+          </div>
 
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
             <label className="flex items-center gap-3 p-3 rounded-lg border border-gray-700 bg-gray-900/40 cursor-pointer">
@@ -423,6 +487,17 @@ const VideoCreator: React.FC<VideoCreatorProps> = ({ initialPrompt = '', onCompl
         <div className="bg-gray-900/60 border border-gray-700 rounded-xl p-4 text-xs text-gray-400 space-y-2">
           <p className="text-gray-300 font-semibold">GitHub + HF sources</p>
           <ul className="list-disc pl-4 space-y-1">
+            <li>
+              <a
+                className="text-cyan-400 hover:underline"
+                href="https://github.com/Anil-matcha/Open-Generative-AI"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Anil-matcha/Open-Generative-AI
+              </a>{' '}
+              — MuAPI video provider (KEY)
+            </li>
             <li>
               <a
                 className="text-cyan-400 hover:underline"

@@ -10,11 +10,28 @@ export default defineConfig(({ mode }) => {
         port: 5173,
         strictPort: true,
         host: '0.0.0.0',
+        proxy: {
+          // MuAPI (Open Generative AI backend) — avoid browser CORS.
+          '/api/muapi': {
+            target: 'https://api.muapi.ai',
+            changeOrigin: true,
+            secure: true,
+            rewrite: (p) => p.replace(/^\/api\/muapi/, ''),
+          },
+        },
       },
       preview: {
         port: 4173,
         strictPort: true,
         host: '0.0.0.0',
+        proxy: {
+          '/api/muapi': {
+            target: 'https://api.muapi.ai',
+            changeOrigin: true,
+            secure: true,
+            rewrite: (p) => p.replace(/^\/api\/muapi/, ''),
+          },
+        },
       },
       plugins: [react()],
       define: {

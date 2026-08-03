@@ -93,21 +93,51 @@ const startLiveScore = (prompt: string, durationSec: number) => {
   };
 };
 
+const sizeForAspect = (
+  aspectRatio: '9:16' | '16:9' | '1:1' | undefined
+): { width: number; height: number } => {
+  switch (aspectRatio) {
+    case '16:9':
+      return { width: 1280, height: 720 };
+    case '1:1':
+      return { width: 1080, height: 1080 };
+    case '9:16':
+    default:
+      return { width: 720, height: 1280 };
+  }
+};
+
 /**
- * Free offline compositor: prompt + images → vertical movie with baked-in soundtrack
+ * Free offline compositor: prompt + images → movie with baked-in soundtrack
  * using Canvas + Web Audio + MediaRecorder.
  */
 export const generateLocalVideo = async (
   prompt: string,
   images: ImageFile[],
   setLoadingMessage: (message: string) => void,
-  options?: { secondsPerImage?: number; fps?: number; withSound?: boolean }
+  options?: {
+    secondsPerImage?: number;
+    fps?: number;
+    withSound?: boolean;
+    aspectRatio?: '9:16' | '16:9' | '1:1';
+    durationSec?: number;
+    hookOverlay?: string;
+    width?: number;
+    height?: number;
+  }
 ): Promise<string> => {
   const fps = options?.fps ?? 30;
-  const secondsPerImage = options?.secondsPerImage ?? (images.length > 1 ? 2.5 : 4);
   const withSound = options?.withSound !== false;
-  const width = 720;
-  const height = 1280;
+  const sized = sizeForAspect(options?.aspectRatio);
+  const width = options?.width ?? sized.width;
+  const height = options?.height ?? sized.height;
+  const hook = (options?.hookOverlay || '').trim();
+
+  const clipCount = Math.max(1, images.length || 1);
+  let secondsPerImage = options?.secondsPerImage ?? (images.length > 1 ? 2.5 : 4);
+  if (options?.durationSec && options.durationSec > 0) {
+    secondsPerImage = options.durationSec / clipCount;
+  }
 
   setLoadingMessage('Composing free local movie with sound...');
 
@@ -216,6 +246,20 @@ export const generateLocalVideo = async (
     } else {
       ctx.fillStyle = 'rgba(255,255,255,0.08)';
       ctx.fillRect(40, 200, width - 80, height - 400);
+    }
+
+    // Safe-zone hook for Shorts/Reels (first ~2s emphasized via larger type early on).
+    if (hook) {
+      const hookProgress = i / Math.max(1, fps * 2.2);
+      const hookAlpha = hookProgress < 1 ? 1 : Math.max(0.55, 1 - (hookProgress - 1) * 0.35);
+      ctx.fillStyle = `rgba(0,0,0,${0.55 * hookAlpha})`;
+      ctx.fillRect(0, 0, width, Math.min(220, height * 0.22));
+      ctx.fillStyle = `rgba(255,255,255,${hookAlpha})`;
+      ctx.font = `700 ${Math.round(width * 0.045)}px Georgia, "Times New Roman", serif`;
+      const hookLines = wrapText(ctx, hook, width - 72);
+      hookLines.slice(0, 3).forEach((line, idx) => {
+        ctx.fillText(line, 36, 64 + idx * Math.round(width * 0.055));
+      });
     }
 
     ctx.fillStyle = 'rgba(0,0,0,0.45)';

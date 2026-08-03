@@ -24,12 +24,23 @@ import {
   setDuixVideoApi,
   setDuixVoiceApi,
 } from './services/duixService';
+import {
+  getMuapiI2vEndpoint,
+  getMuapiKey,
+  getMuapiT2vEndpoint,
+  setMuapiI2vEndpoint,
+  setMuapiKey,
+  setMuapiT2vEndpoint,
+} from './services/muapiService';
 import { AppTab } from './types';
 
 export default function App() {
   const [hasStarted, setHasStarted] = useState(false);
   const [activeTab, setActiveTab] = useState<AppTab>(AppTab.STUDIO);
   const [hfToken, setHfToken] = useState(getStoredHfToken());
+  const [muapiKey, setMuapiKeyState] = useState(getMuapiKey());
+  const [muapiT2v, setMuapiT2vState] = useState(getMuapiT2vEndpoint());
+  const [muapiI2v, setMuapiI2vState] = useState(getMuapiI2vEndpoint());
   const [comfyUrl, setComfyUrlState] = useState(getComfyUrl());
   const [comfyCkpt, setComfyCkptState] = useState(getComfyCheckpoint());
   const [comfyStatus, setComfyStatus] = useState<'unknown' | 'up' | 'down'>('unknown');
@@ -108,6 +119,76 @@ export default function App() {
                 />
                 <p className="text-xs text-gray-500 font-mono">
                   Browser localStorage only. Gemini / Veo uses GEMINI_API_KEY from .env.local.
+                </p>
+              </section>
+
+              <section className="space-y-3 border border-gray-700 rounded-xl p-4 bg-gray-800/40">
+                <h3 className="text-white font-semibold">
+                  MuAPI / Open Generative AI{' '}
+                  <a
+                    className="text-cyan-400 text-xs font-normal underline"
+                    href="https://github.com/Anil-matcha/Open-Generative-AI"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    GitHub
+                  </a>
+                </h3>
+                <p className="text-gray-400 text-sm">
+                  Optional paid upgrade for Seedance / Wan video via{' '}
+                  <a
+                    href="https://muapi.ai"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-cyan-400 underline"
+                  >
+                    muapi.ai
+                  </a>
+                  . Free HF/local path stays default.
+                </p>
+                <label className="block text-xs text-gray-500 font-mono uppercase">API key</label>
+                <input
+                  type="password"
+                  value={muapiKey}
+                  onChange={(e) => {
+                    setMuapiKeyState(e.target.value);
+                    setMuapiKey(e.target.value);
+                  }}
+                  placeholder="MuAPI x-api-key"
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-cyan-500"
+                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 font-mono uppercase mb-1">
+                      T2V endpoint
+                    </label>
+                    <input
+                      value={muapiT2v}
+                      onChange={(e) => {
+                        setMuapiT2vState(e.target.value);
+                        setMuapiT2vEndpoint(e.target.value);
+                      }}
+                      className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-cyan-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 font-mono uppercase mb-1">
+                      I2V endpoint
+                    </label>
+                    <input
+                      value={muapiI2v}
+                      onChange={(e) => {
+                        setMuapiI2vState(e.target.value);
+                        setMuapiI2vEndpoint(e.target.value);
+                      }}
+                      className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-cyan-500"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Defaults: <span className="text-gray-300">seedance-v2.0-t2v</span> /{' '}
+                  <span className="text-gray-300">wan2.2-image-to-video</span>. Dev calls proxy through{' '}
+                  <span className="text-gray-300">/api/muapi</span>.
                 </p>
               </section>
 
@@ -241,6 +322,28 @@ export default function App() {
               <section className="space-y-2 border border-gray-700 rounded-xl p-4 bg-gray-800/40 text-sm text-gray-400">
                 <h3 className="text-white font-semibold">Also integrated</h3>
                 <ul className="list-disc pl-5 space-y-1">
+                  <li>
+                    <a
+                      className="text-cyan-400 underline"
+                      href="https://github.com/Anil-matcha/Open-Generative-AI"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open Generative AI
+                    </a>{' '}
+                    — MuAPI multi-model studio companion
+                  </li>
+                  <li>
+                    <a
+                      className="text-cyan-400 underline"
+                      href="https://github.com/Anil-matcha/Free-AI-Social-Media-Scheduler"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Free-AI-Social-Media-Scheduler
+                    </a>{' '}
+                    — real schedule/publish (Creative OS exports a caption pack)
+                  </li>
                   <li>
                     <a
                       className="text-cyan-400 underline"

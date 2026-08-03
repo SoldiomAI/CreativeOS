@@ -16,6 +16,7 @@ export type VideoProvider =
   | 'local'
   | 'comfy'
   | 'duix'
+  | 'muapi'
   | 'veo';
 
 export type HfVideoModel =
@@ -25,6 +26,8 @@ export type HfVideoModel =
   | 'wan-space'
   | 'hf-inference';
 
+export type AspectRatio = '9:16' | '16:9' | '1:1';
+
 export interface VideoGenerationRequest {
   prompt: string;
   images?: ImageFile[];
@@ -33,6 +36,12 @@ export interface VideoGenerationRequest {
   soundtrack?: boolean;
   /** Add TTS narration from the prompt (default true). */
   voiceover?: boolean;
+  /** Target aspect for local / MuAPI (default 9:16). */
+  aspectRatio?: AspectRatio;
+  /** Target duration hint in seconds (local compositor + MuAPI). */
+  durationSec?: number;
+  /** Opening hook text burned into local compositor frames. */
+  hookOverlay?: string;
 }
 
 export enum AppTab {
