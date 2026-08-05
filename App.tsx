@@ -40,6 +40,16 @@ import {
   setYoutubePrivacy,
   YoutubePrivacy,
 } from './services/youtubeService';
+import {
+  getPostizApiKey,
+  getPostizBaseUrl,
+  getReachWebhookAuth,
+  getReachWebhookUrl,
+  setPostizApiKey,
+  setPostizBaseUrl,
+  setReachWebhookAuth,
+  setReachWebhookUrl,
+} from './services/connectorService';
 import { AppTab } from './types';
 
 export default function App() {
@@ -59,6 +69,10 @@ export default function App() {
   const [duixAvatar, setDuixAvatarState] = useState(getDuixAvatarVideoPath());
   const [duixRefAudio, setDuixRefAudioState] = useState(getDuixRefAudio());
   const [duixRefText, setDuixRefTextState] = useState(getDuixRefText());
+  const [postizBase, setPostizBaseState] = useState(getPostizBaseUrl());
+  const [postizKey, setPostizKeyState] = useState(getPostizApiKey());
+  const [reachWebhook, setReachWebhookState] = useState(getReachWebhookUrl());
+  const [reachWebhookAuth, setReachWebhookAuthState] = useState(getReachWebhookAuth());
 
   useEffect(() => {
     if (activeTab !== AppTab.SETTINGS) return;
@@ -127,6 +141,84 @@ export default function App() {
                 <p className="text-xs text-gray-500">
                   Future schedule date/time → YouTube private until publishAt (real schedule). Gemini still
                   writes captions via GEMINI_API_KEY.
+                </p>
+              </section>
+
+              <section className="space-y-3 border border-gray-700 rounded-xl p-4 bg-gray-800/40">
+                <h3 className="text-white font-semibold">Agent Reach — publish connectors</h3>
+                <p className="text-gray-400 text-sm">
+                  Publishing always has a route: direct API → scheduler API → MCP/webhook → share sheet →
+                  CLI script / manual. Configure any (or none) — unconfigured routes are skipped and the
+                  next fallback is used.
+                </p>
+
+                <label className="block text-xs text-gray-500 font-mono uppercase">
+                  Scheduler API base URL (Postiz-compatible,{' '}
+                  <a
+                    className="text-cyan-400 underline normal-case"
+                    href="https://github.com/gitroomhq/postiz-app"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    self-hostable
+                  </a>
+                  )
+                </label>
+                <input
+                  value={postizBase}
+                  onChange={(e) => {
+                    setPostizBaseState(e.target.value);
+                    setPostizBaseUrl(e.target.value);
+                  }}
+                  placeholder="https://api.postiz.com or http://localhost:3000/api"
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-emerald-500"
+                />
+                <label className="block text-xs text-gray-500 font-mono uppercase">Scheduler API key</label>
+                <input
+                  type="password"
+                  value={postizKey}
+                  onChange={(e) => {
+                    setPostizKeyState(e.target.value);
+                    setPostizApiKey(e.target.value);
+                  }}
+                  placeholder="Postiz public API key"
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-emerald-500"
+                />
+                <p className="text-xs text-gray-500">
+                  One scheduler holds the OAuth for 25+ networks / 50+ accounts — Creative OS sends the
+                  video + captions there and it posts or schedules for you.
+                </p>
+
+                <label className="block text-xs text-gray-500 font-mono uppercase">
+                  MCP / webhook bridge URL
+                </label>
+                <input
+                  value={reachWebhook}
+                  onChange={(e) => {
+                    setReachWebhookState(e.target.value);
+                    setReachWebhookUrl(e.target.value);
+                  }}
+                  placeholder="MCP HTTP endpoint, Zapier/Make/n8n webhook, or custom worker"
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-emerald-500"
+                />
+                <label className="block text-xs text-gray-500 font-mono uppercase">
+                  Bridge Authorization header (optional)
+                </label>
+                <input
+                  type="password"
+                  value={reachWebhookAuth}
+                  onChange={(e) => {
+                    setReachWebhookAuthState(e.target.value);
+                    setReachWebhookAuth(e.target.value);
+                  }}
+                  placeholder="Bearer …"
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-emerald-500"
+                />
+                <p className="text-xs text-gray-500">
+                  The bridge receives a JSON job (<span className="text-gray-300">tool: publish_post</span>,
+                  platform, caption, hashtags, scheduleAt, video as data URL) — MCP-friendly and works with
+                  any automation. The CLI route needs nothing here: Caption Studio can download{' '}
+                  <span className="text-gray-300">publish.sh</span> (ffmpeg + youtubeuploader + curl).
                 </p>
               </section>
 

@@ -6,10 +6,12 @@ import {
   buildFallbackCampaign,
   copyToClipboard,
   downloadSocialExportPack,
+  downloadTextFile,
   formatCaptionWithTags,
 } from '../services/socialExport';
 import { captureVideoCover, downloadCover } from '../services/coverFrame';
 import { publishForReal, PlatformPublishStatus } from '../services/publishService';
+import { buildPublishCliScript, getConnectorAvailability } from '../services/connectorService';
 import { getGoogleOAuthClientId } from '../services/youtubeService';
 import { revokeObjectUrl } from '../services/utils';
 import VideoCreator from './VideoCreator';
@@ -57,6 +59,7 @@ const Studio: React.FC = () => {
     tiktok: 'idle',
   });
   const [platformMessages, setPlatformMessages] = useState<Record<string, string>>({});
+  const [platformRoutes, setPlatformRoutes] = useState<Record<string, string>>({});
   const [publishLinks, setPublishLinks] = useState<Record<string, string>>({});
   const [isPublishing, setIsPublishing] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
@@ -215,12 +218,26 @@ const Studio: React.FC = () => {
     }
   };
 
+  const handleDownloadCliScript = () => {
+    if (!socialCampaign) return;
+    const script = buildPublishCliScript({
+      prompt: usedPrompt,
+      hook: usedHook,
+      campaign: socialCampaign,
+      scheduleAtIso: `${scheduleDate}T${scheduleTime}:00`,
+    });
+    downloadTextFile(script, 'creativeos-publish.sh');
+    setCopyNote('publish.sh downloaded — run it next to the movie file (chmod +x first)');
+    setTimeout(() => setCopyNote(null), 4000);
+  };
+
   const handlePublish = async () => {
     if (!videoUrl || !socialCampaign) return;
     setIsPublishing(true);
     setError(null);
     setPublishLinks({});
     setPlatformMessages({});
+    setPlatformRoutes({});
     setPlatformStatuses({ youtube: 'idle', instagram: 'idle', tiktok: 'idle' });
 
     try {
@@ -240,6 +257,9 @@ const Studio: React.FC = () => {
       const links: Record<string, string> = {};
       if (youtube?.url) links.youtube = youtube.url;
       setPublishLinks(links);
+      const routes: Record<string, string> = {};
+      for (const r of results) if (r.via) routes[r.platform] = r.via;
+      setPlatformRoutes(routes);
 
       const hardFail = results.filter((r) => r.status === 'error');
       if (hardFail.length === results.length) {
@@ -278,6 +298,7 @@ const Studio: React.FC = () => {
     setSocialCampaign(null);
     setPlatformStatuses({ youtube: 'idle', instagram: 'idle', tiktok: 'idle' });
     setPlatformMessages({});
+    setPlatformRoutes({});
     setPublishLinks({});
     setIsPublished(false);
     setIsPublishing(false);
@@ -395,6 +416,11 @@ const Studio: React.FC = () => {
             {(['youtube', 'instagram', 'tiktok'] as const).map((p) => (
               <div key={p}>
                 <span className="text-white/70 uppercase tracking-wider mr-2">{p}</span>
+                {platformRoutes[p] && (
+                  <span className="mr-2 px-1.5 py-0.5 rounded bg-white/10 text-[10px] uppercase tracking-wider text-amber-200">
+                    via {platformRoutes[p]}
+                  </span>
+                )}
                 {platformMessages[p] || platformStatuses[p]}
               </div>
             ))}
@@ -427,11 +453,28 @@ const Studio: React.FC = () => {
               </span>
             </h2>
             <p className="text-gray-400 text-sm">
-              YouTube Shorts uploads via Google. Schedule date/time is honored by YouTube when in the future.
-              IG/TT open the real system share sheet.
+              Publish tries every configured route in order: direct API → scheduler API → MCP/webhook →
+              share sheet → manual. There is always a fallback.
               {!getGoogleOAuthClientId() && (
                 <span className="text-amber-300"> Add Google OAuth Client ID in Optimization first.</span>
               )}
+            </p>
+            <p className="text-[11px] font-mono mt-1 space-x-3">
+              {(() => {
+                const a = getConnectorAvailability();
+                const chip = (label: string, on: boolean) => (
+                  <span key={label} className={on ? 'text-emerald-400' : 'text-gray-600'}>
+                    {on ? '●' : '○'} {label}
+                  </span>
+                );
+                return [
+                  chip('YouTube API', Boolean(getGoogleOAuthClientId())),
+                  chip('Scheduler API', a.scheduler),
+                  chip('MCP/Webhook', a.mcp),
+                  chip('Share sheet', a.share),
+                  chip('CLI + Manual', true),
+                ];
+              })()}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -455,6 +498,14 @@ const Studio: React.FC = () => {
               className="bg-cyan-700 hover:bg-cyan-600 disabled:bg-gray-600 text-white font-bold px-4 py-2 rounded-lg text-sm"
             >
               {exporting ? 'Exporting…' : 'Download Export Pack'}
+            </button>
+            <button
+              onClick={handleDownloadCliScript}
+              disabled={!socialCampaign}
+              title="Generate publish.sh: ffmpeg transcode + youtubeuploader + scheduler/webhook curl — run from terminal or cron"
+              className="bg-gray-800 hover:bg-gray-700 disabled:opacity-50 border border-gray-600 text-gray-200 font-bold px-4 py-2 rounded-lg text-sm"
+            >
+              CLI script
             </button>
             <button
               onClick={handlePublish}
@@ -482,6 +533,11 @@ const Studio: React.FC = () => {
                 <div className="absolute inset-0 bg-black/80 z-10 flex flex-col items-center justify-center p-4 text-center">
                   {platformStatuses[key] === 'done' ? (
                     <div className="text-emerald-400 text-sm">
+                      {platformRoutes[key] && (
+                        <span className="block mb-1 text-[10px] uppercase tracking-wider text-amber-200">
+                          via {platformRoutes[key]}
+                        </span>
+                      )}
                       {platformMessages[key] || 'Done'}
                       {publishLinks[key] && (
                         <a

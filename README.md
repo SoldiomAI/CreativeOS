@@ -44,11 +44,20 @@ View the original AI Studio shell: https://ai.studio/apps/drive/1tuNPhOa8D1Xc0RS
    - **Google OAuth Web Client ID** for real YouTube Shorts publish (YouTube Data API v3; JS origin `http://localhost:5173`)
    - Optional `GOOGLE_CLIENT_ID` in `.env.local`
 
-### Real social publish
+### Real social publish — all ways, with fallbacks
 
-- **YouTube Shorts** — Google OAuth → YouTube Data API resumable upload. Future date/time uses YouTube `publishAt`.
-- **Instagram / TikTok** — OS share sheet with the video file when supported (mobile). Desktop copies caption.
-- Captions use **Gemini** when `GEMINI_API_KEY` is set.
+Every publish tries each configured route in order until one succeeds, so there is always a way out:
+
+| Route | What it is | Setup |
+| --- | --- | --- |
+| **Direct API** | YouTube Shorts via Google OAuth → YouTube Data API resumable upload (`publishAt` for scheduling) | Google OAuth Web Client ID in Optimization |
+| **Scheduler API** | Postiz-compatible API ([self-hostable](https://github.com/gitroomhq/postiz-app), 25+ networks / 50+ accounts) — Creative OS uploads the video and creates/schedules posts there | Scheduler base URL + API key in Optimization → Agent Reach |
+| **MCP / webhook bridge** | Generic JSON job (`tool: publish_post`, platform, caption, hashtags, scheduleAt, video data URL) POSTed to any MCP HTTP endpoint, Zapier/Make/n8n webhook, or custom worker | Bridge URL (+ optional Authorization header) in Optimization → Agent Reach |
+| **CLI script** | Caption Studio generates `creativeos-publish.sh`: ffmpeg WebM→MP4 transcode, per-platform caption files, [youtubeuploader](https://github.com/porjo/youtubeuploader), and curl calls to the scheduler/bridge — runnable from any terminal or cron | Nothing — download and run |
+| **Share sheet / manual** | OS share sheet with the video file (mobile IG/TikTok handoff); final fallback copies the caption to clipboard + export pack download | Nothing |
+
+The route that actually delivered is shown per platform (`via api / scheduler / mcp / share / manual`).
+Captions use **Gemini** when `GEMINI_API_KEY` is set (local marketing fallback otherwise).
 
 ### Optional local backends
 

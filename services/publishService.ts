@@ -6,13 +6,22 @@ import {
   uploadYoutubeShort,
   YoutubeUploadResult,
 } from './youtubeService';
+import {
+  getConnectorAvailability,
+  publishViaMcpBridge,
+  publishViaScheduler,
+  PublishRoute,
+  ReachPlatform,
+} from './connectorService';
 
 export type PlatformPublishStatus = 'idle' | 'uploading' | 'sharing' | 'done' | 'error' | 'skipped';
 
 export type PlatformPublishResult = {
-  platform: 'youtube' | 'instagram' | 'tiktok';
+  platform: ReachPlatform;
   status: PlatformPublishStatus;
   message: string;
+  /** Which route actually delivered: api | scheduler | mcp | share | manual. */
+  via?: PublishRoute;
   url?: string;
 };
 
@@ -55,14 +64,54 @@ export type RealPublishOptions = {
   hook?: string;
   scheduleDate: string;
   scheduleTime: string;
-  platforms?: Array<'youtube' | 'instagram' | 'tiktok'>;
+  platforms?: ReachPlatform[];
   onPlatform?: (platform: string, status: PlatformPublishStatus, message: string) => void;
 };
 
+type LadderStep = {
+  route: PublishRoute;
+  run: () => Promise<PlatformPublishResult>;
+};
+
+/** Run fallback steps in order; first success wins, errors accumulate for the report. */
+const runLadder = async (
+  platform: ReachPlatform,
+  steps: LadderStep[],
+  onStatus?: (status: PlatformPublishStatus, message: string) => void
+): Promise<PlatformPublishResult> => {
+  const failures: string[] = [];
+  for (const step of steps) {
+    try {
+      const result = await step.run();
+      if (failures.length && result.status === 'done') {
+        result.message = `${result.message} (fell back to ${step.route})`;
+      }
+      return result;
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      const cancelled = /AbortError|cancelled|canceled/i.test(message);
+      if (cancelled) {
+        return { platform, status: 'skipped', message: 'Share cancelled', via: step.route };
+      }
+      failures.push(`${step.route}: ${message}`);
+      onStatus?.('uploading', `${step.route} failed — trying next route…`);
+    }
+  }
+  return {
+    platform,
+    status: 'error',
+    message: failures.join('\n') || 'No publish route configured',
+  };
+};
+
 /**
- * Real publish orchestration:
- * - YouTube Shorts: Google OAuth + YouTube Data API (binary upload / schedule)
- * - Instagram & TikTok: native share sheet with file when the OS supports it (real app handoff)
+ * Real publish orchestration with all-ways fallback per platform:
+ *
+ *   YouTube:        direct API (Google OAuth) → scheduler API → MCP/webhook → manual
+ *   Instagram/TikTok: scheduler API → MCP/webhook → OS share sheet → manual (clipboard)
+ *
+ * The CLI route lives beside this: Studio can download a generated publish.sh
+ * (see connectorService.buildPublishCliScript) to run the same job from a terminal/cron.
  */
 export const publishForReal = async (opts: RealPublishOptions): Promise<{
   results: PlatformPublishResult[];
@@ -72,64 +121,124 @@ export const publishForReal = async (opts: RealPublishOptions): Promise<{
   const results: PlatformPublishResult[] = [];
   let youtube: YoutubeUploadResult | undefined;
   const blob = await blobFromVideoUrl(opts.videoUrl);
+  const avail = getConnectorAvailability();
+  const scheduleAtIso = `${opts.scheduleDate}T${opts.scheduleTime}:00`;
+  const scheduleInFuture = new Date(scheduleAtIso).getTime() > Date.now();
+
+  const schedulerStep = (platform: ReachPlatform, meta: SocialMetadata): LadderStep => ({
+    route: 'scheduler',
+    run: async () => {
+      opts.onPlatform?.(platform, 'uploading', 'Sending to scheduler (Postiz API)…');
+      const r = await publishViaScheduler({
+        platform,
+        videoBlob: blob,
+        meta,
+        scheduleAtIso: scheduleInFuture ? new Date(scheduleAtIso).toISOString() : undefined,
+      });
+      return {
+        platform,
+        status: 'done' as const,
+        via: 'scheduler' as const,
+        message: r.scheduled
+          ? `Scheduled on ${r.integration} via scheduler API`
+          : `Queued on ${r.integration} via scheduler API`,
+      };
+    },
+  });
+
+  const mcpStep = (platform: ReachPlatform, meta: SocialMetadata): LadderStep => ({
+    route: 'mcp',
+    run: async () => {
+      opts.onPlatform?.(platform, 'uploading', 'Handing to MCP/webhook bridge…');
+      await publishViaMcpBridge({
+        platform,
+        videoBlob: blob,
+        meta,
+        prompt: opts.prompt,
+        hook: opts.hook,
+        scheduleAtIso: scheduleInFuture ? new Date(scheduleAtIso).toISOString() : undefined,
+      });
+      return {
+        platform,
+        status: 'done' as const,
+        via: 'mcp' as const,
+        message: 'Job accepted by MCP/webhook bridge',
+      };
+    },
+  });
+
+  const manualStep = (platform: ReachPlatform, meta: SocialMetadata): LadderStep => ({
+    route: 'manual',
+    run: async () => {
+      await copyToClipboard(formatCaptionWithTags(meta));
+      return {
+        platform,
+        status: 'done' as const,
+        via: 'manual' as const,
+        message: 'Caption copied — download the movie (or CLI script) and post manually',
+      };
+    },
+  });
 
   if (platforms.includes('youtube')) {
-    opts.onPlatform?.('youtube', 'uploading', 'Connecting Google / YouTube…');
-    try {
-      if (!getGoogleOAuthClientId()) {
-        throw new Error(
-          'GOOGLE_OAUTH_CLIENT_ID_REQUIRED: Add Google OAuth Client ID in Optimization to publish Shorts for real.'
-        );
-      }
-      const publishAt = `${opts.scheduleDate}T${opts.scheduleTime}:00`;
-      youtube = await uploadYoutubeShort({
-        videoBlob: blob,
-        title: titleFromCaption(opts.campaign.youtube, opts.hook || opts.prompt),
-        description: formatCaptionWithTags(opts.campaign.youtube),
-        tags: opts.campaign.youtube.hashtags,
-        publishAt,
-        onProgress: (m) => opts.onPlatform?.('youtube', 'uploading', m),
+    const steps: LadderStep[] = [];
+
+    if (getGoogleOAuthClientId()) {
+      steps.push({
+        route: 'api',
+        run: async () => {
+          opts.onPlatform?.('youtube', 'uploading', 'Connecting Google / YouTube…');
+          youtube = await uploadYoutubeShort({
+            videoBlob: blob,
+            title: titleFromCaption(opts.campaign.youtube, opts.hook || opts.prompt),
+            description: formatCaptionWithTags(opts.campaign.youtube),
+            tags: opts.campaign.youtube.hashtags,
+            publishAt: scheduleAtIso,
+            onProgress: (m) => opts.onPlatform?.('youtube', 'uploading', m),
+          });
+          const msg = youtube.scheduled
+            ? `Scheduled ${youtube.publishAt ? new Date(youtube.publishAt).toLocaleString() : ''}`
+            : 'Published';
+          return { platform: 'youtube' as const, status: 'done' as const, via: 'api' as const, message: msg, url: youtube.url };
+        },
       });
-      const msg = youtube.scheduled
-        ? `Scheduled ${youtube.publishAt ? new Date(youtube.publishAt).toLocaleString() : ''}`
-        : 'Published';
-      opts.onPlatform?.('youtube', 'done', msg);
-      results.push({
-        platform: 'youtube',
-        status: 'done',
-        message: msg,
-        url: youtube.url,
-      });
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : 'YouTube publish failed';
-      opts.onPlatform?.('youtube', 'error', message);
-      results.push({ platform: 'youtube', status: 'error', message });
     }
+    if (avail.scheduler) steps.push(schedulerStep('youtube', opts.campaign.youtube));
+    if (avail.mcp) steps.push(mcpStep('youtube', opts.campaign.youtube));
+    steps.push(manualStep('youtube', opts.campaign.youtube));
+
+    const result = await runLadder('youtube', steps, (s, m) => opts.onPlatform?.('youtube', s, m));
+    opts.onPlatform?.('youtube', result.status, result.message);
+    results.push(result);
   }
 
   for (const platform of ['instagram', 'tiktok'] as const) {
     if (!platforms.includes(platform)) continue;
-    opts.onPlatform?.(platform, 'sharing', 'Opening system share…');
-    try {
-      const caption = formatCaptionWithTags(opts.campaign[platform]);
-      const mode = await shareToNativeApps(blob, caption, `creativeos-${platform}.webm`);
-      const message =
-        mode === 'shared'
-          ? `Shared to device — pick ${platform === 'instagram' ? 'Instagram' : 'TikTok'} in the sheet`
-          : 'Caption copied — download the movie and paste into the app (desktop has no file share API)';
-      opts.onPlatform?.(platform, 'done', message);
-      results.push({ platform, status: 'done', message });
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : `${platform} share cancelled`;
-      // User cancelling share is common — treat as skipped not hard fail
-      const cancelled = /AbortError|cancelled|canceled/i.test(message);
-      opts.onPlatform?.(platform, cancelled ? 'skipped' : 'error', message);
-      results.push({
-        platform,
-        status: cancelled ? 'skipped' : 'error',
-        message: cancelled ? 'Share cancelled' : message,
-      });
-    }
+    const meta = opts.campaign[platform];
+    const steps: LadderStep[] = [];
+
+    if (avail.scheduler) steps.push(schedulerStep(platform, meta));
+    if (avail.mcp) steps.push(mcpStep(platform, meta));
+    steps.push({
+      route: 'share',
+      run: async () => {
+        opts.onPlatform?.(platform, 'sharing', 'Opening system share…');
+        const caption = formatCaptionWithTags(meta);
+        const mode = await shareToNativeApps(blob, caption, `creativeos-${platform}.webm`);
+        if (mode === 'copied') throw new Error('No file share API on this device');
+        return {
+          platform,
+          status: 'done' as const,
+          via: 'share' as const,
+          message: `Shared to device — pick ${platform === 'instagram' ? 'Instagram' : 'TikTok'} in the sheet`,
+        };
+      },
+    });
+    steps.push(manualStep(platform, meta));
+
+    const result = await runLadder(platform, steps, (s, m) => opts.onPlatform?.(platform, s, m));
+    opts.onPlatform?.(platform, result.status, result.message);
+    results.push(result);
   }
 
   return { results, youtube };
