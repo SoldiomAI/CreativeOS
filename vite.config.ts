@@ -18,6 +18,11 @@ export default defineConfig(({ mode }) => {
             secure: true,
             rewrite: (p) => p.replace(/^\/api\/muapi/, ''),
           },
+          // Stripe billing API (run: npm run payment-api)
+          '/api/billing': {
+            target: 'http://127.0.0.1:4242',
+            changeOrigin: true,
+          },
         },
       },
       preview: {
@@ -31,6 +36,10 @@ export default defineConfig(({ mode }) => {
             secure: true,
             rewrite: (p) => p.replace(/^\/api\/muapi/, ''),
           },
+          '/api/billing': {
+            target: 'http://127.0.0.1:4242',
+            changeOrigin: true,
+          },
         },
       },
       plugins: [react()],
@@ -43,6 +52,10 @@ export default defineConfig(({ mode }) => {
         // HF token should come from in-app Settings (localStorage), not the client bundle.
         'process.env.HF_TOKEN': JSON.stringify(''),
         'process.env.VITE_HF_TOKEN': JSON.stringify(''),
+        'process.env.VITE_STRIPE_PUBLISHABLE_KEY': JSON.stringify(env.VITE_STRIPE_PUBLISHABLE_KEY || ''),
+        'process.env.VITE_STRIPE_PRICE_PRO': JSON.stringify(env.VITE_STRIPE_PRICE_PRO || ''),
+        'process.env.VITE_STRIPE_PRICE_CREDITS_10': JSON.stringify(env.VITE_STRIPE_PRICE_CREDITS_10 || ''),
+        'process.env.VITE_STRIPE_PRICE_CREDITS_50': JSON.stringify(env.VITE_STRIPE_PRICE_CREDITS_50 || ''),
       },
       resolve: {
         alias: {

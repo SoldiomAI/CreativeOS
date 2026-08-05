@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { ImageFile } from '../types';
 import { fileToBase64, editImage, generateImage } from '../services/geminiService';
 import { generateAnyVideo } from '../services/videoEngine';
-import Spinner from './Spinner';
+import { addToLibrary } from '../services/libraryStore';
 import LoadingOverlay from './LoadingOverlay';
 
 enum EditorTab {
@@ -85,15 +85,20 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, sourceImag
 };
 
 interface EditorToolProps {
-  onBack: () => void;
+  onBack?: () => void;
+  /** Send the current still + prompt into Factory Studio as a video seed. */
+  onAnimate?: (image: ImageFile, prompt: string) => void;
+  /** Open a library item straight in Caption Studio for publishing. */
+  onPublishVideo?: (libraryItemId: string) => void;
 }
 
-const EditorTool: React.FC<EditorToolProps> = ({ onBack }) => {
+const EditorTool: React.FC<EditorToolProps> = ({ onBack, onAnimate, onPublishVideo }) => {
   const [activeTab, setActiveTab] = useState<EditorTab>(EditorTab.EDIT);
   const [prompt, setPrompt] = useState<string>('');
   const [sourceImage, setSourceImage] = useState<ImageFile | null>(null);
   const [generatedContent, setGeneratedContent] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [savedItemId, setSavedItemId] = useState<string | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
@@ -108,6 +113,7 @@ const EditorTool: React.FC<EditorToolProps> = ({ onBack }) => {
       setGeneratedContent(null);
     }
     setVideoUrl(null);
+    setSavedItemId(null);
     setIsLoading(false);
     setError(null);
     setLoadingMessage('');
@@ -199,11 +205,18 @@ const EditorTool: React.FC<EditorToolProps> = ({ onBack }) => {
 
     try {
       const images = sourceImage ? [sourceImage] : [];
-      const { url } = await generateAnyVideo(
+      const { url, providerUsed, hasAudio } = await generateAnyVideo(
         { prompt, images, provider: 'local', soundtrack: true, voiceover: true },
         setLoadingMessage
       );
       setVideoUrl(url);
+      // Stills videos land in the same Asset Library as Studio movies.
+      try {
+        const { id } = await addToLibrary(prompt, providerUsed, url, hasAudio);
+        setSavedItemId(id);
+      } catch {
+        setSavedItemId(null);
+      }
     } catch (e: any) {
       if (e.message === 'API_KEY_REQUIRED' || e.message === 'API_KEY_INVALID') {
         setHasApiKey(false);
@@ -254,11 +267,13 @@ const EditorTool: React.FC<EditorToolProps> = ({ onBack }) => {
   return (
     <div className="w-full max-w-4xl mx-auto flex flex-col h-full justify-center text-center p-4 md:p-8 animate-fade-in-fast">
       <div className="relative w-full bg-gray-800/50 backdrop-blur-md rounded-2xl shadow-2xl ring-1 ring-white/10 p-6 md:p-8 flex flex-col md:flex-row gap-6 md:gap-8">
-        <button onClick={onBack} className="absolute top-4 left-4 text-gray-400 hover:text-white transition-colors z-10" aria-label="Go back">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-        </button>
+        {onBack && (
+          <button onClick={onBack} className="absolute top-4 left-4 text-gray-400 hover:text-white transition-colors z-10" aria-label="Go back">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+          </button>
+        )}
         
         <div className="md:w-1/2 flex flex-col space-y-4">
           <div className="flex w-full bg-gray-900/50 p-1 rounded-lg">
@@ -339,6 +354,37 @@ const EditorTool: React.FC<EditorToolProps> = ({ onBack }) => {
               <img src={generatedContent} alt="Generated content" className="w-full h-full object-contain rounded-lg" />
             )}
           </div>
+          {(generatedContent || videoUrl) && (
+            <div className="mt-3 flex flex-wrap gap-2 justify-center">
+              {generatedContent && sourceImage && onAnimate && !videoUrl && (
+                <button
+                  type="button"
+                  onClick={() => onAnimate(sourceImage, prompt || 'Animate this still')}
+                  className="px-4 py-2 rounded-full bg-cyan-700 hover:bg-cyan-600 text-white text-sm font-semibold"
+                >
+                  Animate in Factory →
+                </button>
+              )}
+              {videoUrl && savedItemId && onPublishVideo && (
+                <button
+                  type="button"
+                  onClick={() => onPublishVideo(savedItemId)}
+                  className="px-4 py-2 rounded-full cos-btn-primary text-ink text-sm font-bold"
+                >
+                  Caption + Publish →
+                </button>
+              )}
+              {videoUrl && (
+                <a
+                  href={videoUrl}
+                  download="creativeos-still-lab.webm"
+                  className="px-4 py-2 rounded-full border border-gray-600 text-gray-300 text-sm hover:text-white"
+                >
+                  Download
+                </a>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

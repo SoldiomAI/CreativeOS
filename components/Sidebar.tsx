@@ -1,6 +1,7 @@
 import React from 'react';
 import { AppTab } from '../types';
 import { getGodModeEnabled } from '../services/godMode';
+import { getCredits, isPro } from '../services/creditsStore';
 
 interface SidebarProps {
   activeTab: AppTab;
@@ -9,6 +10,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
   const god = getGodModeEnabled();
+  const credits = getCredits();
   const menuItems = [
     {
       id: AppTab.DASHBOARD,
@@ -95,8 +97,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
 
       <div className="p-4 border-t border-[rgba(255,214,140,0.12)] hidden md:block">
         <p className="text-[10px] uppercase tracking-[0.3em] text-white/35 mb-2">Signal</p>
-        <p className="text-xs text-[#9aa8bc] leading-relaxed">
+        <p className="text-xs text-[#9aa8bc] leading-relaxed mb-2">
           Free HF first. MuAPI when keyed. Local never dies.
+        </p>
+        <p className="text-[11px] font-mono text-amber-200/80">
+          {isPro() ? 'PRO · unlimited local' : `${credits.balance} credits`}
         </p>
       </div>
     </aside>

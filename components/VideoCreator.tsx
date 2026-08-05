@@ -8,6 +8,7 @@ import { isSpeechDictationSupported, startPromptDictation } from '../services/sp
 import { getMuapiKey } from '../services/muapiService';
 import { getPreset, PLATFORM_PRESETS, PlatformPresetId } from '../services/socialExport';
 import { getGodModeEnabled, setGodModeEnabled, extractHook } from '../services/godMode';
+import { canUseHostedGeneration, consumeCredit, recordMovieCreated } from '../services/creditsStore';
 import { revokeObjectUrl, safeErrorMessage } from '../services/utils';
 import Spinner from './Spinner';
 import LoadingOverlay from './LoadingOverlay';
@@ -15,6 +16,8 @@ import LoadingOverlay from './LoadingOverlay';
 interface VideoCreatorProps {
   initialPrompt?: string;
   initialHook?: string;
+  /** Seed reference images (e.g. a still sent over from the Stills lab). */
+  initialImages?: ImageFile[];
   onComplete: (
     videoUrl: string,
     prompt: string,
@@ -33,12 +36,13 @@ interface VideoCreatorProps {
 const VideoCreator: React.FC<VideoCreatorProps> = ({
   initialPrompt = '',
   initialHook = '',
+  initialImages,
   onComplete,
 }) => {
   const [prompt, setPrompt] = useState(initialPrompt);
   const [hook, setHook] = useState(initialHook);
   const [presetId, setPresetId] = useState<PlatformPresetId>('tiktok');
-  const [images, setImages] = useState<ImageFile[]>([]);
+  const [images, setImages] = useState<ImageFile[]>(initialImages || []);
   const [provider, setProvider] = useState<VideoProvider>('auto');
   const [hfToken, setHfToken] = useState(getStoredHfToken());
   const [showToken, setShowToken] = useState(false);
@@ -176,8 +180,16 @@ const VideoCreator: React.FC<VideoCreatorProps> = ({
       return;
     }
     if (hfToken.trim()) setStoredHfToken(hfToken);
-    if (provider === 'muapi' && !getMuapiKey()) {
-      setError('MuAPI needs a key in Optimization / Connections (muapi.ai).');
+    if (provider === 'muapi' && !getMuapiKey() && !canUseHostedGeneration(false)) {
+      setError(
+        'MuAPI needs your key in Links, or buy hosted credits under Billing (payment API ready).'
+      );
+      return;
+    }
+    if (provider === 'veo' && !canUseHostedGeneration(false)) {
+      setError(
+        'Gemini Veo needs your API key or hosted credits. Pick a free HF/local provider, or buy credits in Billing.'
+      );
       return;
     }
 
@@ -200,6 +212,10 @@ const VideoCreator: React.FC<VideoCreatorProps> = ({
         },
         setLoadingMessage
       );
+      if ((providerUsed === 'muapi' || providerUsed === 'veo') && !getMuapiKey()) {
+        consumeCredit(`${providerUsed}-generation`);
+      }
+      recordMovieCreated();
       onComplete(url, prompt, providerUsed, hasAudio, {
         aspectRatio: preset.aspectRatio,
         durationSec,

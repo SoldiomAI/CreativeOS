@@ -5,10 +5,16 @@ import {
   LibraryItem,
   removeFromLibraryAsync,
 } from '../services/libraryStore';
+import { StudioSeed } from '../services/appFlow';
 import { downloadCover } from '../services/coverFrame';
 import { formatCaptionWithTags } from '../services/socialExport';
 
-const Library: React.FC = () => {
+type LibraryProps = {
+  onStudioCreate?: (seed: StudioSeed) => void;
+  onStudioPublish?: (libraryItemId: string) => void;
+};
+
+const Library: React.FC<LibraryProps> = ({ onStudioCreate, onStudioPublish }) => {
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -33,7 +39,8 @@ const Library: React.FC = () => {
       <div className="h-full flex flex-col items-center justify-center text-center px-6">
         <p className="cos-display text-3xl text-white mb-3">Asset Library</p>
         <p className="text-[#9aa8bc] text-sm max-w-md">
-          Movies land here in IndexedDB (bigger than localStorage). Create one in Factory Studio.
+          Movies land here in IndexedDB. Create in Factory Studio or Still Lab — then publish to every
+          platform from Caption Studio.
         </p>
       </div>
     );
@@ -44,7 +51,7 @@ const Library: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="cos-display text-3xl text-white">Asset Library</h2>
-          <p className="text-[#9aa8bc] text-sm">{items.length} saved</p>
+          <p className="text-[#9aa8bc] text-sm">{items.length} saved · publish or remix any cut</p>
         </div>
         <button
           onClick={async () => {
@@ -87,17 +94,53 @@ const Library: React.FC = () => {
                 </span>
                 <span>{new Date(item.createdAt).toLocaleString()}</span>
               </div>
+              {item.publishes?.length ? (
+                <div className="flex flex-wrap gap-1">
+                  {item.publishes.slice(-3).map((p, i) => (
+                    <span
+                      key={`${p.platform}-${p.at}-${i}`}
+                      className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-900/30 text-emerald-300"
+                    >
+                      {p.platform} · {p.via}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
               {item.captions?.tiktok && (
                 <p className="text-[11px] text-white/45 line-clamp-2">
                   {formatCaptionWithTags(item.captions.tiktok)}
                 </p>
               )}
               <div className="flex flex-wrap gap-2">
+                {item.videoDataUrl && onStudioPublish && (
+                  <button
+                    type="button"
+                    onClick={() => onStudioPublish(item.id)}
+                    className="flex-1 text-center py-2 rounded-lg cos-btn-primary text-ink text-xs font-bold"
+                  >
+                    Publish
+                  </button>
+                )}
+                {onStudioCreate && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onStudioCreate({
+                        prompt: item.prompt,
+                        hook: item.hook,
+                        godMode: item.godMode,
+                      })
+                    }
+                    className="px-3 py-2 rounded-lg border border-white/15 text-xs text-white/80 hover:text-white hover:border-amber-500/40"
+                  >
+                    Remix
+                  </button>
+                )}
                 {item.videoDataUrl && (
                   <a
                     href={item.videoDataUrl}
                     download={`creativeos-${item.id}.webm`}
-                    className="flex-1 text-center py-2 rounded-lg bg-amber-500/20 text-amber-100 text-xs font-semibold hover:bg-amber-500/30"
+                    className="px-3 py-2 rounded-lg bg-amber-500/20 text-amber-100 text-xs font-semibold hover:bg-amber-500/30"
                   >
                     Download
                   </a>

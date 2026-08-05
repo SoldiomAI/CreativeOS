@@ -50,6 +50,9 @@ import {
   setReachWebhookAuth,
   setReachWebhookUrl,
 } from './services/connectorService';
+import { setDistributeSeed, setStudioSeed } from './services/appFlow';
+import { handleBillingReturn } from './services/paymentService';
+import BillingPanel from './components/BillingPanel';
 import { AppTab } from './types';
 
 export default function App() {
@@ -73,6 +76,22 @@ export default function App() {
   const [postizKey, setPostizKeyState] = useState(getPostizApiKey());
   const [reachWebhook, setReachWebhookState] = useState(getReachWebhookUrl());
   const [reachWebhookAuth, setReachWebhookAuthState] = useState(getReachWebhookAuth());
+  const [studioSessionKey, setStudioSessionKey] = useState(0);
+  const [billingNotice, setBillingNotice] = useState<string | null>(null);
+
+  const goTab = (tab: AppTab) => setActiveTab(tab);
+
+  const goStudioCreate = (seed?: Parameters<typeof setStudioSeed>[0]) => {
+    if (seed) setStudioSeed(seed);
+    setStudioSessionKey((k) => k + 1);
+    setActiveTab(AppTab.STUDIO);
+  };
+
+  const goStudioPublish = (libraryItemId: string) => {
+    setDistributeSeed({ libraryItemId });
+    setStudioSessionKey((k) => k + 1);
+    setActiveTab(AppTab.STUDIO);
+  };
 
   useEffect(() => {
     if (activeTab !== AppTab.SETTINGS) return;
@@ -80,6 +99,17 @@ export default function App() {
       .then((up) => setComfyStatus(up ? 'up' : 'down'))
       .catch(() => setComfyStatus('down'));
   }, [activeTab, comfyUrl]);
+
+  useEffect(() => {
+    void handleBillingReturn().then((result) => {
+      if (result === 'success') {
+        setBillingNotice('Payment successful — credits updated.');
+        setActiveTab(AppTab.SETTINGS);
+      } else if (result === 'cancel') {
+        setBillingNotice('Checkout cancelled.');
+      }
+    });
+  }, []);
 
   if (!hasStarted) {
     return <LandingPage onGetStarted={() => setHasStarted(true)} />;
@@ -91,10 +121,29 @@ export default function App() {
 
       <main className="flex-grow p-4 md:p-6 overflow-hidden relative cos-grain">
         <div className="relative z-10 h-full">
-          {activeTab === AppTab.DASHBOARD && <Dashboard onNavigate={setActiveTab} />}
-          {activeTab === AppTab.STUDIO && <Studio />}
-          {activeTab === AppTab.STILLS && <EditorTool />}
-          {activeTab === AppTab.LIBRARY && <Library />}
+          {billingNotice && (
+            <div className="mb-3 cos-panel rounded-lg px-4 py-2 text-sm text-emerald-200 flex justify-between items-center">
+              <span>{billingNotice}</span>
+              <button type="button" className="text-white/50 hover:text-white" onClick={() => setBillingNotice(null)}>
+                ×
+              </button>
+            </div>
+          )}
+          {activeTab === AppTab.DASHBOARD && (
+            <Dashboard onNavigate={goTab} onStudioCreate={goStudioCreate} onStudioPublish={goStudioPublish} />
+          )}
+          {activeTab === AppTab.STUDIO && <Studio key={studioSessionKey} />}
+          {activeTab === AppTab.STILLS && (
+            <EditorTool
+              onAnimate={(image, promptText) =>
+                goStudioCreate({ prompt: promptText, images: [image], hook: promptText.slice(0, 120) })
+              }
+              onPublishVideo={goStudioPublish}
+            />
+          )}
+          {activeTab === AppTab.LIBRARY && (
+            <Library onStudioCreate={goStudioCreate} onStudioPublish={goStudioPublish} />
+          )}
           {activeTab === AppTab.SETTINGS && (
             <div className="max-w-2xl mx-auto h-full overflow-y-auto flex flex-col gap-6 p-4 pb-10">
               <div>
@@ -104,6 +153,8 @@ export default function App() {
                   keeps :3000)
                 </p>
               </div>
+
+              <BillingPanel onNotice={setBillingNotice} />
 
               <section className="space-y-3 border border-gray-700 rounded-xl p-4 bg-gray-800/40">
                 <h3 className="text-white font-semibold">Google / YouTube (real publish)</h3>

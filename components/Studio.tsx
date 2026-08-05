@@ -1,7 +1,13 @@
-import React, { useState } from 'react';
-import { CreativeConcept, SocialCampaign, SocialMetadata, VideoProvider } from '../types';
+import React, { useEffect, useState } from 'react';
+import { CreativeConcept, ImageFile, SocialCampaign, SocialMetadata, VideoProvider } from '../types';
 import { generateCreativeConcepts, generateSocialMetadata } from '../services/geminiService';
-import { addToLibrary } from '../services/libraryStore';
+import {
+  addToLibrary,
+  getLibraryItem,
+  recordLibraryPublish,
+  updateLibraryCaptions,
+} from '../services/libraryStore';
+import { takeDistributeSeed, takeStudioSeed } from '../services/appFlow';
 import {
   buildFallbackCampaign,
   copyToClipboard,
@@ -35,6 +41,8 @@ const Studio: React.FC = () => {
   const [isGeneratingConcepts, setIsGeneratingConcepts] = useState(false);
   const [seedPrompt, setSeedPrompt] = useState('');
   const [seedHook, setSeedHook] = useState('');
+  const [seedImages, setSeedImages] = useState<ImageFile[]>([]);
+  const [libraryItemId, setLibraryItemId] = useState<string | null>(null);
 
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [usedPrompt, setUsedPrompt] = useState('');
@@ -71,6 +79,60 @@ const Studio: React.FC = () => {
       return { ...prev, [key]: { ...prev[key], ...patch } };
     });
   };
+
+  // Consume cross-tab seeds: remix/animate from Dashboard, Library or Stills,
+  // or jump straight into Caption Studio to (re)publish a saved movie.
+  useEffect(() => {
+    const studio = takeStudioSeed();
+    if (studio) {
+      setSeedPrompt(studio.prompt || '');
+      setSeedHook(studio.hook || '');
+      setSeedImages(studio.images || []);
+      setMode('create');
+      setStep('produce');
+      return;
+    }
+
+    const dist = takeDistributeSeed();
+    if (!dist) return;
+    void (async () => {
+      const item = await getLibraryItem(dist.libraryItemId);
+      if (!item?.videoDataUrl) {
+        setError('This library item has no stored video — create a new movie instead.');
+        return;
+      }
+      setLibraryItemId(item.id);
+      setVideoUrl(item.videoDataUrl);
+      setUsedPrompt(item.prompt);
+      setUsedHook(item.hook || '');
+      setAspectRatio(item.aspectRatio || '9:16');
+      setDurationSec(item.durationSec || 15);
+      setProviderUsed(item.provider);
+      setHasAudio(item.hasAudio);
+      setUsedGodMode(Boolean(item.godMode));
+      setCoverUrl(item.coverDataUrl || null);
+      setStep('distribute');
+      if (item.captions) {
+        setSocialCampaign(item.captions);
+        return;
+      }
+      setIsGeneratingSocial(true);
+      try {
+        const campaign = await generateSocialMetadata(
+          item.prompt.slice(0, 80),
+          item.hook || item.prompt.slice(0, 120),
+          item.prompt
+        );
+        setSocialCampaign(campaign);
+        await updateLibraryCaptions(item.id, campaign);
+      } catch {
+        setSocialCampaign(buildFallbackCampaign(item.prompt, item.hook));
+      } finally {
+        setIsGeneratingSocial(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleGenerateConcepts = async () => {
     if (!topic) return;
@@ -133,14 +195,17 @@ const Studio: React.FC = () => {
       setCoverUrl(null);
     }
 
+    let savedId: string | null = null;
     try {
-      await addToLibrary(prompt, used, url, audio, {
+      const { id } = await addToLibrary(prompt, used, url, audio, {
         hook: meta?.hook || seedHook,
         aspectRatio: meta?.aspectRatio,
         durationSec: meta?.durationSec,
         coverDataUrl,
         godMode: meta?.godMode,
       });
+      savedId = id;
+      setLibraryItemId(id);
       setSavedNote('Saved to Asset Library (IndexedDB)');
     } catch {
       setSavedNote('Created — library save skipped');
@@ -159,6 +224,7 @@ const Studio: React.FC = () => {
             selectedConcept?.visualDescription || prompt
           );
           setSocialCampaign(campaign);
+          if (savedId) await updateLibraryCaptions(savedId, campaign);
         } catch {
           setSocialCampaign(buildFallbackCampaign(prompt, hookForSocial));
         } finally {
@@ -179,6 +245,7 @@ const Studio: React.FC = () => {
         selectedConcept?.visualDescription || usedPrompt
       );
       setSocialCampaign(campaign);
+      if (libraryItemId) await updateLibraryCaptions(libraryItemId, campaign);
     } catch {
       setSocialCampaign(buildFallbackCampaign(usedPrompt, usedHook || selectedConcept?.hook));
       setError('Could not AI-generate captions — using marketing-style fallbacks.');
@@ -261,6 +328,17 @@ const Studio: React.FC = () => {
       for (const r of results) if (r.via) routes[r.platform] = r.via;
       setPlatformRoutes(routes);
 
+      // Write outcomes back to the Asset Library (outcome ledger).
+      if (libraryItemId) {
+        await updateLibraryCaptions(libraryItemId, socialCampaign);
+        await recordLibraryPublish(
+          libraryItemId,
+          results
+            .filter((r) => r.status === 'done')
+            .map((r) => ({ platform: r.platform, via: r.via || 'unknown', url: r.url, at: Date.now() }))
+        );
+      }
+
       const hardFail = results.filter((r) => r.status === 'error');
       if (hardFail.length === results.length) {
         setError(hardFail.map((r) => `${r.platform}: ${r.message}`).join('\n'));
@@ -295,6 +373,8 @@ const Studio: React.FC = () => {
     setSelectedConcept(null);
     setSeedPrompt('');
     setSeedHook('');
+    setSeedImages([]);
+    setLibraryItemId(null);
     setSocialCampaign(null);
     setPlatformStatuses({ youtube: 'idle', instagram: 'idle', tiktok: 'idle' });
     setPlatformMessages({});
@@ -632,9 +712,10 @@ const Studio: React.FC = () => {
       {mode === 'create' ? (
         <div className="flex-grow min-h-0">
           <VideoCreator
-            key={`${seedPrompt}|${seedHook}`}
+            key={`${seedPrompt}|${seedHook}|${seedImages.length}`}
             initialPrompt={seedPrompt}
             initialHook={seedHook}
+            initialImages={seedImages}
             onComplete={handleVideoComplete}
           />
         </div>

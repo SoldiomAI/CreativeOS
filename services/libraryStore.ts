@@ -1,5 +1,13 @@
 import { SocialCampaign, VideoProvider } from '../types';
 
+export interface PublishRecord {
+  platform: string;
+  /** Route that delivered: api | scheduler | mcp | share | manual */
+  via: string;
+  url?: string;
+  at: number;
+}
+
 export interface LibraryItem {
   id: string;
   prompt: string;
@@ -12,6 +20,8 @@ export interface LibraryItem {
   aspectRatio?: string;
   durationSec?: number;
   captions?: SocialCampaign;
+  /** Outcome ledger — where this movie went out and via which route. */
+  publishes?: PublishRecord[];
   createdAt: number;
   hasAudio: boolean;
   godMode?: boolean;
@@ -142,7 +152,7 @@ export const addToLibrary = async (
   videoUrl: string,
   hasAudio: boolean,
   meta?: AddLibraryMeta
-): Promise<LibraryItem[]> => {
+): Promise<{ id: string; items: LibraryItem[] }> => {
   let videoDataUrl: string | undefined;
   try {
     const blob = await fetch(videoUrl).then((r) => r.blob());
@@ -182,7 +192,7 @@ export const addToLibrary = async (
     console.warn('IDB put failed, falling back to localStorage', e);
     const next = [item, ...loadLibrary()].slice(0, 8);
     saveLibrary(next);
-    return next;
+    return { id: item.id, items: next };
   }
 
   // Keep a tiny LS mirror for Dashboard sync stats
@@ -193,7 +203,12 @@ export const addToLibrary = async (
     }))
   );
 
-  return idbGetAll();
+  return { id: item.id, items: await idbGetAll() };
+};
+
+export const getLibraryItem = async (id: string): Promise<LibraryItem | null> => {
+  const all = await idbGetAll();
+  return all.find((i) => i.id === id) || null;
 };
 
 export const updateLibraryCaptions = async (id: string, captions: SocialCampaign) => {
@@ -201,6 +216,16 @@ export const updateLibraryCaptions = async (id: string, captions: SocialCampaign
   const item = all.find((i) => i.id === id);
   if (!item) return;
   item.captions = captions;
+  await idbPut(item);
+};
+
+/** Append publish outcomes to an item's ledger (which platforms, via which route). */
+export const recordLibraryPublish = async (id: string, records: PublishRecord[]) => {
+  if (!records.length) return;
+  const all = await idbGetAll();
+  const item = all.find((i) => i.id === id);
+  if (!item) return;
+  item.publishes = [...(item.publishes || []), ...records].slice(-20);
   await idbPut(item);
 };
 
@@ -234,5 +259,15 @@ export const libraryStats = async () => {
     acc[i.provider] = (acc[i.provider] || 0) + 1;
     return acc;
   }, {});
-  return { total: items.length, withAudio, god, providers, recent: items.slice(0, 6) };
+  const publishes = items.reduce((n, i) => n + (i.publishes?.length || 0), 0);
+  const published = items.filter((i) => i.publishes?.length).length;
+  return {
+    total: items.length,
+    withAudio,
+    god,
+    providers,
+    publishes,
+    published,
+    recent: items.slice(0, 6),
+  };
 };

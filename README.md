@@ -32,13 +32,24 @@ View the original AI Studio shell: https://ai.studio/apps/drive/1tuNPhOa8D1Xc0RS
 
 **Prerequisites:** Node.js
 
-1. Install dependencies:
-   `npm install`
-2. Optional `GEMINI_API_KEY` in [`.env.local`](.env.local) for concepts, Imagen stills, and Veo.
-3. Run the app:
-   `npm run dev`  
-   Open **http://localhost:5173/** (not `:3000`, which is reserved for Antigravity).
-4. Paste tokens in **Optimization / Connections** (browser `localStorage` only — not bundled):
+1. Copy [`.env.example`](.env.example) → `.env.local` and fill keys you need.
+2. Install dependencies: `npm install`
+3. **App only:** `npm run dev` → **http://localhost:5173/** (not `:3000`)
+4. **App + Stripe billing API:** `npm run dev:all` (Vite + payment API on `:4242`, proxied at `/api/billing`)
+
+### Connected pipeline (ready to use)
+
+| Tab | What it does | Connects to |
+| --- | --- | --- |
+| **Command** | Live stats, pipeline status, one-click publish on recent cuts | Library, Factory, Billing |
+| **Still Lab** | Generate/edit stills → quick local video → **Animate in Factory** / **Publish** | Factory Caption Studio |
+| **Factory** | Hook Foundry → Prompt→Movie (all providers, God Mode) → save to Library | Still Lab seeds, Caption Studio |
+| **Library** | IndexedDB movies, publish ledger, **Publish** / **Remix** | Caption Studio, Factory |
+| **Links** | All connectors + **Billing (Stripe)** | Every publish route |
+
+Flow: **Still Lab → Factory → Library → Caption Studio → YouTube / Scheduler / MCP / CLI / manual**
+
+4. Paste tokens in **Links** (browser `localStorage` only — not bundled):
    - Free HF token for Spaces / Inference
    - Optional MuAPI key for Open Generative AI models (proxied via `/api/muapi`)
    - **Google OAuth Web Client ID** for real YouTube Shorts publish (YouTube Data API v3; JS origin `http://localhost:5173`)
@@ -58,6 +69,23 @@ Every publish tries each configured route in order until one succeeds, so there 
 
 The route that actually delivered is shown per platform (`via api / scheduler / mcp / share / manual`).
 Captions use **Gemini** when `GEMINI_API_KEY` is set (local marketing fallback otherwise).
+
+### Billing (Stripe payment API)
+
+Payment API is included and ready — configure Stripe to enable checkout:
+
+1. Create products/prices in [Stripe Dashboard](https://dashboard.stripe.com/products)
+2. Set in `.env.local`:
+   - `VITE_STRIPE_PUBLISHABLE_KEY`, `VITE_STRIPE_PRICE_*` (client)
+   - `STRIPE_SECRET_KEY` (server only — `npm run payment-api`)
+3. Optional webhook: `POST /api/billing/webhook` with `STRIPE_WEBHOOK_SECRET`
+4. Plans in **Links → Billing**: Pro monthly, 10-credit pack, 50-credit pack
+5. Free tier starts with **10 hosted credits**; Pro adds 100/mo. Own API keys (HF, MuAPI, Gemini) bypass credits.
+
+```bash
+npm run payment-api    # billing only
+npm run dev:all        # app + billing together
+```
 
 ### Optional local backends
 
