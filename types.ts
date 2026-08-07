@@ -17,6 +17,7 @@ export type VideoProvider =
   | 'comfy'
   | 'duix'
   | 'muapi'
+  | 'wangp'
   | 'veo';
 
 export type HfVideoModel =

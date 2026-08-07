@@ -59,6 +59,13 @@ import {
   setYoutubeAgentApiKey,
   setYoutubeAgentUrl,
 } from './services/youtubeAgentService';
+import {
+  getWan2gpModelType,
+  getWan2gpSettingsJson,
+  pingWan2gp,
+  setWan2gpModelType,
+  setWan2gpSettingsJson,
+} from './services/wan2gpService';
 import BillingPanel from './components/BillingPanel';
 import { AppTab } from './types';
 
@@ -86,6 +93,9 @@ export default function App() {
   const [ytAgentUrl, setYtAgentUrlState] = useState(getYoutubeAgentUrl());
   const [ytAgentKey, setYtAgentKeyState] = useState(getYoutubeAgentApiKey());
   const [ytAgentStatus, setYtAgentStatus] = useState<'unknown' | 'up' | 'down'>('unknown');
+  const [wangpModel, setWangpModelState] = useState(getWan2gpModelType());
+  const [wangpSettings, setWangpSettingsState] = useState(getWan2gpSettingsJson());
+  const [wangpStatus, setWangpStatus] = useState<'unknown' | 'up' | 'down'>('unknown');
   const [studioSessionKey, setStudioSessionKey] = useState(0);
   const [billingNotice, setBillingNotice] = useState<string | null>(null);
 
@@ -111,7 +121,10 @@ export default function App() {
     pingYoutubeAgent()
       .then((h) => setYtAgentStatus(h.ok && h.initialized ? 'up' : h.ok ? 'down' : 'down'))
       .catch(() => setYtAgentStatus('down'));
-  }, [activeTab, comfyUrl, ytAgentUrl]);
+    pingWan2gp()
+      .then((h) => setWangpStatus(h.ready ? 'up' : h.ok ? 'down' : 'down'))
+      .catch(() => setWangpStatus('down'));
+  }, [activeTab, comfyUrl, ytAgentUrl, wangpModel]);
 
   useEffect(() => {
     void handleBillingReturn().then((result) => {
@@ -499,6 +512,71 @@ export default function App() {
               </section>
 
               <section className="space-y-3 border border-gray-700 rounded-xl p-4 bg-gray-800/40">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-white font-semibold">
+                    Wan2GP (local GPU){' '}
+                    <a
+                      className="text-cyan-400 text-xs font-normal underline"
+                      href="https://github.com/deepbeepmeep/Wan2GP"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      github.com/deepbeepmeep/Wan2GP
+                    </a>
+                  </h3>
+                  <span
+                    className={`text-[10px] font-mono uppercase ${
+                      wangpStatus === 'up'
+                        ? 'text-emerald-400'
+                        : wangpStatus === 'down'
+                          ? 'text-rose-400'
+                          : 'text-gray-500'
+                    }`}
+                  >
+                    {wangpStatus === 'up' ? 'ready' : wangpStatus === 'down' ? 'offline' : '…'}
+                  </span>
+                </div>
+                <p className="text-gray-400 text-sm">
+                  Wan 2.1/2.2, LTX-2, Hunyuan, Flux, and 50+ models on your GPU. Clone Wan2GP, set{' '}
+                  <span className="text-gray-200">WAN2GP_ROOT</span>, run{' '}
+                  <span className="text-gray-200">npm run wangp-bridge</span> (port{' '}
+                  <span className="text-gray-200">7867</span>). Pick provider{' '}
+                  <span className="text-gray-200">Wan2GP (local GPU)</span> in Factory or let Auto use it when
+                  the bridge is ready.
+                </p>
+                <label className="block text-xs text-gray-500 font-mono uppercase">model_type</label>
+                <input
+                  value={wangpModel}
+                  onChange={(e) => {
+                    setWangpModelState(e.target.value);
+                    setWan2gpModelType(e.target.value);
+                  }}
+                  placeholder="wan2.2_t2v_14B"
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-cyan-500"
+                />
+                <label className="block text-xs text-gray-500 font-mono uppercase">
+                  Optional settings JSON (export from WanGP UI)
+                </label>
+                <textarea
+                  value={wangpSettings}
+                  onChange={(e) => {
+                    setWangpSettingsState(e.target.value);
+                    setWan2gpSettingsJson(e.target.value);
+                  }}
+                  rows={3}
+                  placeholder='{"num_inference_steps": 25}'
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white font-mono outline-none focus:border-cyan-500"
+                />
+                <p className="text-xs text-gray-500">
+                  Setup:{' '}
+                  <code className="text-gray-300">
+                    export WAN2GP_ROOT=/path/to/Wan2GP && npm run wangp-bridge
+                  </code>
+                  . Dev proxy: <span className="text-gray-300">/api/wangp</span> → :7867.
+                </p>
+              </section>
+
+              <section className="space-y-3 border border-gray-700 rounded-xl p-4 bg-gray-800/40">
                 <h3 className="text-white font-semibold">
                   Duix.Avatar{' '}
                   <a
@@ -610,6 +688,17 @@ export default function App() {
                       youtube-automation-agent
                     </a>{' '}
                     — 7-agent autonomous YouTube channel (Gemini) · fallback publish route
+                  </li>
+                  <li>
+                    <a
+                      className="text-cyan-400 underline"
+                      href="https://github.com/deepbeepmeep/Wan2GP"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Wan2GP
+                    </a>{' '}
+                    — local GPU video (Wan 2.1/2.2, LTX-2, Hunyuan, Flux) via bridge on :7867
                   </li>
                   <li>
                     <a

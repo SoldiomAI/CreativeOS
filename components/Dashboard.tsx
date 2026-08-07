@@ -7,6 +7,7 @@ import { getStoredHfToken } from '../services/hfVideoService';
 import { getConnectorAvailability } from '../services/connectorService';
 import { getGoogleOAuthClientId } from '../services/youtubeService';
 import { generateViaYoutubeAgent, pingYoutubeAgent } from '../services/youtubeAgentService';
+import { pingWan2gp } from '../services/wan2gpService';
 import { getCredits, isPro } from '../services/creditsStore';
 import { pingBillingApi } from '../services/paymentService';
 import { AppTab } from '../types';
@@ -28,6 +29,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onStudioCreate, onStu
   const [credits, setCredits] = useState(getCredits());
   const [billingOk, setBillingOk] = useState(false);
   const [ytAgentOk, setYtAgentOk] = useState(false);
+  const [wangpOk, setWangpOk] = useState(false);
   const [agentBusy, setAgentBusy] = useState(false);
   const [agentNote, setAgentNote] = useState<string | null>(null);
 
@@ -43,6 +45,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onStudioCreate, onStu
     });
     pingBillingApi().then((h) => setBillingOk(h.ok && h.stripe));
     pingYoutubeAgent().then((h) => setYtAgentOk(h.ok && Boolean(h.initialized)));
+    pingWan2gp().then((h) => setWangpOk(Boolean(h.ready)));
     setCredits(getCredits());
   }, []);
 
@@ -54,6 +57,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onStudioCreate, onStu
     { label: 'Scheduler API', on: reach.scheduler },
     { label: 'MCP bridge', on: reach.mcp },
     { label: 'YouTube Agent', on: ytAgentOk },
+    { label: 'Wan2GP GPU', on: wangpOk },
     { label: 'God Mode', on: getGodModeEnabled() },
     { label: 'Billing API', on: billingOk },
   ];

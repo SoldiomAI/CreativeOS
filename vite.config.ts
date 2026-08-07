@@ -29,6 +29,12 @@ export default defineConfig(({ mode }) => {
             changeOrigin: true,
             rewrite: (p) => p.replace(/^\/api\/youtube-agent/, ''),
           },
+          // Wan2GP bridge (python server/wangp-bridge.py + WAN2GP_ROOT)
+          '/api/wangp': {
+            target: 'http://127.0.0.1:7867',
+            changeOrigin: true,
+            rewrite: (p) => p.replace(/^\/api\/wangp/, '/api/wangp'),
+          },
         },
       },
       preview: {
@@ -51,6 +57,12 @@ export default defineConfig(({ mode }) => {
             target: 'http://127.0.0.1:3456',
             changeOrigin: true,
             rewrite: (p) => p.replace(/^\/api\/youtube-agent/, ''),
+          },
+          // Wan2GP bridge (python server/wangp-bridge.py + WAN2GP_ROOT)
+          '/api/wangp': {
+            target: 'http://127.0.0.1:7867',
+            changeOrigin: true,
+            rewrite: (p) => p.replace(/^\/api\/wangp/, '/api/wangp'),
           },
         },
       },

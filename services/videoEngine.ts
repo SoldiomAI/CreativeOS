@@ -9,10 +9,12 @@ import { generateImageWithComfy, pingComfyUi } from './comfyService';
 import { submitDuixAvatarVideo, synthesizeDuixVoice } from './duixService';
 import { fileToBase64 } from './geminiService';
 import { generateVideoWithMuapi, getMuapiKey, uploadToMuapi } from './muapiService';
+import { generateVideoWithWan2gp, pingWan2gp } from './wan2gpService';
 import { amplifyPromptForProviders, buildGodBrief } from './godMode';
 
 const PROVIDER_TIMEOUT_MS = 180_000;
 const MUAPI_TIMEOUT_MS = 360_000;
+const WANGP_TIMEOUT_MS = 900_000;
 
 export const VIDEO_PROVIDERS: {
   id: VideoProvider;
@@ -81,6 +83,13 @@ export const VIDEO_PROVIDERS: {
     id: 'local',
     label: 'Local Free Compositor',
     blurb: 'Always works offline from prompt + images',
+    free: true,
+    needsImage: false,
+  },
+  {
+    id: 'wangp',
+    label: 'Wan2GP (local GPU)',
+    blurb: 'github.com/deepbeepmeep/Wan2GP — Wan 2.1/2.2, LTX-2, Hunyuan, Flux',
     free: true,
     needsImage: false,
   },
@@ -192,6 +201,11 @@ const runProvider = async (
         return runDuixMovie(prompt, setLoadingMessage);
       case 'muapi':
         return runMuapiMovie(providerPrompt, images, setLoadingMessage, request);
+      case 'wangp':
+        return generateVideoWithWan2gp(providerPrompt, images, setLoadingMessage, {
+          aspectRatio: request.aspectRatio,
+          durationSec: request.durationSec,
+        });
       case 'veo': {
         if (!images[0]) throw new Error('Veo needs at least one source image');
         return generateVeoVideo(images[0], providerPrompt, setLoadingMessage);
@@ -207,7 +221,8 @@ const runProvider = async (
     }
   };
 
-  const timeout = provider === 'muapi' ? MUAPI_TIMEOUT_MS : PROVIDER_TIMEOUT_MS;
+  const timeout =
+    provider === 'muapi' ? MUAPI_TIMEOUT_MS : provider === 'wangp' ? WANGP_TIMEOUT_MS : PROVIDER_TIMEOUT_MS;
   return withTimeout(work(), timeout, provider);
 };
 
@@ -297,21 +312,25 @@ export const generateAnyVideo = async (
     const hasToken = Boolean(getStoredHfToken() || process.env.HF_TOKEN);
     const hasMuapi = Boolean(getMuapiKey());
     const comfyUp = await pingComfyUi().catch(() => false);
+    const wangpUp = (await pingWan2gp().catch(() => ({ ok: false, ready: false }))).ready;
     const chain: Exclude<VideoProvider, 'auto'>[] = [];
 
     if (request.godMode) {
-      // God Mode: one fast HF attempt, optional MuAPI, then legendary local multi-beat.
+      // God Mode: one fast HF attempt, optional MuAPI/Wan2GP, then legendary local multi-beat.
       chain.push('ltx');
       if (hasMuapi) chain.push('muapi');
+      if (wangpUp) chain.push('wangp');
       if (comfyUp) chain.push('comfy');
       chain.push('local');
     } else {
       chain.push('ltx');
       if (images.length) {
         if (hasToken) chain.push('hf-inference');
+        if (wangpUp) chain.push('wangp');
         if (comfyUp) chain.push('comfy');
       } else {
         chain.push('cogvideox');
+        if (wangpUp) chain.push('wangp');
         if (comfyUp) chain.push('comfy');
         else chain.push('wan-space');
       }
@@ -345,6 +364,7 @@ export const generateAnyVideo = async (
   const hasAudio =
     providerUsed === 'duix' ||
     providerUsed === 'muapi' ||
+    providerUsed === 'wangp' ||
     (wantAudio &&
       (providerUsed === 'local' ||
         providerUsed === 'comfy' ||

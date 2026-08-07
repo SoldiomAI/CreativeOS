@@ -12,6 +12,7 @@ Create **any short-form video from a prompt and optional images**, using free op
 | [Comfy-Org/ComfyUI](https://github.com/Comfy-Org/ComfyUI) | Local text→image → movie | Free (local) |
 | [cjpais/Handy](https://github.com/cjpais/Handy) | Offline desktop STT; Studio Dictate uses Web Speech | Free |
 | [duixcom/Duix-Avatar](https://github.com/duixcom/Duix-Avatar) | Local talking avatar (Docker APIs) | Free (local) |
+| [deepbeepmeep/Wan2GP](https://github.com/deepbeepmeep/Wan2GP) | Local GPU video (Wan 2.1/2.2, LTX-2, Hunyuan, Flux) | Free (local GPU) |
 | [Anil-matcha/Open-Generative-AI](https://github.com/Anil-matcha/Open-Generative-AI) | Optional MuAPI Seedance/Wan T2V & I2V | MuAPI key |
 | [Lightricks/LTX-Video](https://huggingface.co/spaces/Lightricks/ltx-video-distilled) | Text / Image → Video (HF Space) | Free |
 | [ByteDance/AnimateDiff-Lightning](https://huggingface.co/spaces/ByteDance/AnimateDiff-Lightning) | Text → Video (HF Space) | Free |
@@ -95,6 +96,15 @@ npm run dev:all        # app + billing together
 - **Handy** — [Handy](https://github.com/cjpais/Handy) for offline desktop dictation
 - **OmniVoice** — automatic voiceover via [k2-fsa/OmniVoice](https://github.com/k2-fsa/OmniVoice) HF Space
 - **MuAPI** — [Open Generative AI](https://github.com/Anil-matcha/Open-Generative-AI) / [muapi.ai](https://muapi.ai) (defaults: `seedance-v2.0-t2v`, `wan2.2-image-to-video`)
+- **Wan2GP** — [Wan2GP](https://github.com/deepbeepmeep/Wan2GP) local GPU pipeline via `server/wangp-bridge.py`:
+
+```bash
+git clone https://github.com/deepbeepmeep/Wan2GP
+export WAN2GP_ROOT=/path/to/Wan2GP
+npm run wangp-bridge   # :7867, proxied at /api/wangp
+```
+
+Set `model_type` in **Links** (or export settings JSON from WanGP UI). Factory provider **Wan2GP (local GPU)** or **Auto** when the bridge is ready. Generation can take several minutes on consumer GPUs.
 
 ## Quality checks
 
