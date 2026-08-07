@@ -62,6 +62,7 @@ Every publish tries each configured route in order until one succeeds, so there 
 | Route | What it is | Setup |
 | --- | --- | --- |
 | **Direct API** | YouTube Shorts via Google OAuth → YouTube Data API resumable upload (`publishAt` for scheduling) | Google OAuth Web Client ID in Optimization |
+| **YouTube Agent** | [youtube-automation-agent](https://github.com/darkzOGx/youtube-automation-agent) — 7 AI agents generate + queue publish from your topic (Gemini free tier on agent) | Clone agent, `npm run walkthrough`, run on `:3456`, set URL in Links |
 | **Scheduler API** | Postiz-compatible API ([self-hostable](https://github.com/gitroomhq/postiz-app), 25+ networks / 50+ accounts) — Creative OS uploads the video and creates/schedules posts there | Scheduler base URL + API key in Optimization → Agent Reach |
 | **MCP / webhook bridge** | Generic JSON job (`tool: publish_post`, platform, caption, hashtags, scheduleAt, video data URL) POSTed to any MCP HTTP endpoint, Zapier/Make/n8n webhook, or custom worker | Bridge URL (+ optional Authorization header) in Optimization → Agent Reach |
 | **CLI script** | Caption Studio generates `creativeos-publish.sh`: ffmpeg WebM→MP4 transcode, per-platform caption files, [youtubeuploader](https://github.com/porjo/youtubeuploader), and curl calls to the scheduler/bridge — runnable from any terminal or cron | Nothing — download and run |

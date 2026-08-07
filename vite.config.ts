@@ -23,6 +23,12 @@ export default defineConfig(({ mode }) => {
             target: 'http://127.0.0.1:4242',
             changeOrigin: true,
           },
+          // YouTube Automation Agent — github.com/darkzOGx/youtube-automation-agent
+          '/api/youtube-agent': {
+            target: 'http://127.0.0.1:3456',
+            changeOrigin: true,
+            rewrite: (p) => p.replace(/^\/api\/youtube-agent/, ''),
+          },
         },
       },
       preview: {
@@ -39,6 +45,12 @@ export default defineConfig(({ mode }) => {
           '/api/billing': {
             target: 'http://127.0.0.1:4242',
             changeOrigin: true,
+          },
+          // YouTube Automation Agent — github.com/darkzOGx/youtube-automation-agent
+          '/api/youtube-agent': {
+            target: 'http://127.0.0.1:3456',
+            changeOrigin: true,
+            rewrite: (p) => p.replace(/^\/api\/youtube-agent/, ''),
           },
         },
       },

@@ -52,6 +52,13 @@ import {
 } from './services/connectorService';
 import { setDistributeSeed, setStudioSeed } from './services/appFlow';
 import { handleBillingReturn } from './services/paymentService';
+import {
+  getYoutubeAgentApiKey,
+  getYoutubeAgentUrl,
+  pingYoutubeAgent,
+  setYoutubeAgentApiKey,
+  setYoutubeAgentUrl,
+} from './services/youtubeAgentService';
 import BillingPanel from './components/BillingPanel';
 import { AppTab } from './types';
 
@@ -76,6 +83,9 @@ export default function App() {
   const [postizKey, setPostizKeyState] = useState(getPostizApiKey());
   const [reachWebhook, setReachWebhookState] = useState(getReachWebhookUrl());
   const [reachWebhookAuth, setReachWebhookAuthState] = useState(getReachWebhookAuth());
+  const [ytAgentUrl, setYtAgentUrlState] = useState(getYoutubeAgentUrl());
+  const [ytAgentKey, setYtAgentKeyState] = useState(getYoutubeAgentApiKey());
+  const [ytAgentStatus, setYtAgentStatus] = useState<'unknown' | 'up' | 'down'>('unknown');
   const [studioSessionKey, setStudioSessionKey] = useState(0);
   const [billingNotice, setBillingNotice] = useState<string | null>(null);
 
@@ -98,7 +108,10 @@ export default function App() {
     pingComfyUi()
       .then((up) => setComfyStatus(up ? 'up' : 'down'))
       .catch(() => setComfyStatus('down'));
-  }, [activeTab, comfyUrl]);
+    pingYoutubeAgent()
+      .then((h) => setYtAgentStatus(h.ok && h.initialized ? 'up' : h.ok ? 'down' : 'down'))
+      .catch(() => setYtAgentStatus('down'));
+  }, [activeTab, comfyUrl, ytAgentUrl]);
 
   useEffect(() => {
     void handleBillingReturn().then((result) => {
@@ -270,6 +283,68 @@ export default function App() {
                   platform, caption, hashtags, scheduleAt, video as data URL) — MCP-friendly and works with
                   any automation. The CLI route needs nothing here: Caption Studio can download{' '}
                   <span className="text-gray-300">publish.sh</span> (ffmpeg + youtubeuploader + curl).
+                </p>
+              </section>
+
+              <section className="space-y-3 border border-gray-700 rounded-xl p-4 bg-gray-800/40">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-white font-semibold">
+                    YouTube Automation Agent{' '}
+                    <a
+                      className="text-cyan-400 text-xs font-normal underline"
+                      href="https://github.com/darkzOGx/youtube-automation-agent"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      github.com/darkzOGx/youtube-automation-agent
+                    </a>
+                  </h3>
+                  <span
+                    className={`text-[10px] font-mono uppercase ${
+                      ytAgentStatus === 'up'
+                        ? 'text-emerald-400'
+                        : ytAgentStatus === 'down'
+                          ? 'text-rose-400'
+                          : 'text-gray-500'
+                    }`}
+                  >
+                    {ytAgentStatus === 'up' ? 'running' : ytAgentStatus === 'down' ? 'offline' : '…'}
+                  </span>
+                </div>
+                <p className="text-gray-400 text-sm">
+                  7 AI agents (strategy → script → thumbnail → SEO → production → publish → analytics).
+                  Run locally with <span className="text-gray-200">npm start</span> on port{' '}
+                  <span className="text-gray-200">3456</span>. Uses your Gemini key for free-tier video.
+                  CreativeOS hands off topics when direct YouTube OAuth fails — the agent generates its own
+                  video and queues publish.
+                </p>
+                <label className="block text-xs text-gray-500 font-mono uppercase">Agent API URL</label>
+                <input
+                  value={ytAgentUrl}
+                  onChange={(e) => {
+                    setYtAgentUrlState(e.target.value);
+                    setYoutubeAgentUrl(e.target.value);
+                  }}
+                  placeholder="http://127.0.0.1:3456"
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-red-500"
+                />
+                <label className="block text-xs text-gray-500 font-mono uppercase">
+                  x-api-key (matches agent API_KEY in .env)
+                </label>
+                <input
+                  type="password"
+                  value={ytAgentKey}
+                  onChange={(e) => {
+                    setYtAgentKeyState(e.target.value);
+                    setYoutubeAgentApiKey(e.target.value);
+                  }}
+                  placeholder="optional"
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-red-500"
+                />
+                <p className="text-xs text-gray-500">
+                  Setup:{' '}
+                  <code className="text-gray-300">git clone … && npm install && npm run walkthrough</code>.
+                  Dev proxy: <span className="text-gray-300">/api/youtube-agent</span> → :3456.
                 </p>
               </section>
 
@@ -524,6 +599,17 @@ export default function App() {
                       Free-AI-Social-Media-Scheduler
                     </a>{' '}
                     — real schedule/publish (Creative OS exports a caption pack)
+                  </li>
+                  <li>
+                    <a
+                      className="text-cyan-400 underline"
+                      href="https://github.com/darkzOGx/youtube-automation-agent"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      youtube-automation-agent
+                    </a>{' '}
+                    — 7-agent autonomous YouTube channel (Gemini) · fallback publish route
                   </li>
                   <li>
                     <a

@@ -14,8 +14,9 @@
 
 import { SocialCampaign, SocialMetadata } from '../types';
 import { formatCaptionWithTags } from './socialExport';
+import { getYoutubeAgentApiKey, getYoutubeAgentUrl } from './youtubeAgentService';
 
-export type PublishRoute = 'api' | 'scheduler' | 'mcp' | 'cli' | 'share' | 'manual';
+export type PublishRoute = 'api' | 'scheduler' | 'youtube-agent' | 'mcp' | 'cli' | 'share' | 'manual';
 
 export type ReachPlatform = 'youtube' | 'instagram' | 'tiktok';
 
@@ -55,6 +56,8 @@ export const setReachWebhookAuth = (v: string) => write(LS.webhookAuth, v.trim()
 export type ConnectorAvailability = {
   /** Postiz-compatible scheduler API configured (base URL + key). */
   scheduler: boolean;
+  /** YouTube Automation Agent reachable (github.com/darkzOGx/youtube-automation-agent). */
+  youtubeAgent: boolean;
   /** Generic MCP/webhook bridge configured. */
   mcp: boolean;
   /** OS share sheet available (mobile mostly). */
@@ -63,6 +66,7 @@ export type ConnectorAvailability = {
 
 export const getConnectorAvailability = (): ConnectorAvailability => ({
   scheduler: Boolean(getPostizBaseUrl() && getPostizApiKey()),
+  youtubeAgent: Boolean(getYoutubeAgentUrl()),
   mcp: Boolean(getReachWebhookUrl()),
   share: typeof navigator !== 'undefined' && typeof navigator.share === 'function',
 });
@@ -247,6 +251,8 @@ export const buildPublishCliScript = (opts: {
   const postizKey = getPostizApiKey();
   const webhook = getReachWebhookUrl();
   const webhookAuth = getReachWebhookAuth();
+  const ytAgent = getYoutubeAgentUrl();
+  const ytAgentKey = getYoutubeAgentApiKey();
   const title = (opts.hook || opts.prompt).split('\n')[0].slice(0, 90) || 'Creative OS Short';
 
   const lines: string[] = [
@@ -307,6 +313,17 @@ export const buildPublishCliScript = (opts: {
         opts.scheduleAtIso || null
       ).replace(/"/g, '\\"')}}" \\`,
       `  ${shellQuote(webhook)}`,
+      ''
+    );
+  }
+
+  if (ytAgent) {
+    lines.push(
+      '# --- 6. YouTube Automation Agent (github.com/darkzOGx/youtube-automation-agent) ---',
+      `# Autonomous 7-agent pipeline — generates + queues its own video from topic (uses agent Gemini key)`,
+      `curl -sf -X POST ${ytAgentKey ? `-H ${shellQuote(`x-api-key: ${ytAgentKey}`)} ` : ''}-H "Content-Type: application/json" \\`,
+      `  -d "{\\"topic\\":${JSON.stringify((opts.hook || opts.prompt).slice(0, 200)).replace(/"/g, '\\"')},\\"style\\":\\"engaging\\",\\"length\\":\\"short\\"}" \\`,
+      `  ${shellQuote(ytAgent)}/generate`,
       ''
     );
   }

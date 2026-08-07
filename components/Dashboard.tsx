@@ -6,6 +6,7 @@ import { getMuapiKey } from '../services/muapiService';
 import { getStoredHfToken } from '../services/hfVideoService';
 import { getConnectorAvailability } from '../services/connectorService';
 import { getGoogleOAuthClientId } from '../services/youtubeService';
+import { generateViaYoutubeAgent, pingYoutubeAgent } from '../services/youtubeAgentService';
 import { getCredits, isPro } from '../services/creditsStore';
 import { pingBillingApi } from '../services/paymentService';
 import { AppTab } from '../types';
@@ -26,6 +27,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onStudioCreate, onStu
   const [providers, setProviders] = useState<Record<string, number>>({});
   const [credits, setCredits] = useState(getCredits());
   const [billingOk, setBillingOk] = useState(false);
+  const [ytAgentOk, setYtAgentOk] = useState(false);
+  const [agentBusy, setAgentBusy] = useState(false);
+  const [agentNote, setAgentNote] = useState<string | null>(null);
 
   useEffect(() => {
     libraryStats().then((s) => {
@@ -38,6 +42,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onStudioCreate, onStu
       setProviders(s.providers);
     });
     pingBillingApi().then((h) => setBillingOk(h.ok && h.stripe));
+    pingYoutubeAgent().then((h) => setYtAgentOk(h.ok && Boolean(h.initialized)));
     setCredits(getCredits());
   }, []);
 
@@ -48,6 +53,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onStudioCreate, onStu
     { label: 'YouTube OAuth', on: Boolean(getGoogleOAuthClientId()) },
     { label: 'Scheduler API', on: reach.scheduler },
     { label: 'MCP bridge', on: reach.mcp },
+    { label: 'YouTube Agent', on: ytAgentOk },
     { label: 'God Mode', on: getGodModeEnabled() },
     { label: 'Billing API', on: billingOk },
   ];
@@ -72,8 +78,30 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onStudioCreate, onStu
       action: () => onStudioCreate?.(),
     },
     {
+      title: 'YouTube Agent',
+      blurb: 'Autonomous 7-agent channel (Gemini)',
+      tab: AppTab.SETTINGS,
+      action: async () => {
+        const topic =
+          recent[0]?.prompt ||
+          window.prompt('Topic for YouTube Automation Agent (short-form):') ||
+          '';
+        if (!topic.trim()) return;
+        setAgentBusy(true);
+        setAgentNote(null);
+        try {
+          const r = await generateViaYoutubeAgent({ topic: topic.trim(), length: 'short' });
+          setAgentNote(`Agent queued: "${r.title}"${r.scheduledFor ? ` @ ${new Date(r.scheduledFor).toLocaleString()}` : ''}`);
+        } catch (e: unknown) {
+          setAgentNote(e instanceof Error ? e.message : 'Agent failed — is it running on :3456?');
+        } finally {
+          setAgentBusy(false);
+        }
+      },
+    },
+    {
       title: 'Caption Studio',
-      blurb: 'Publish via API / scheduler / CLI',
+      blurb: 'Publish via API / scheduler / agent / CLI',
       tab: AppTab.STUDIO,
       action: () => {
         const latest = recent.find((r) => r.videoDataUrl);
@@ -127,14 +155,18 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onStudioCreate, onStu
           <button
             key={step.title}
             type="button"
+            disabled={step.title === 'YouTube Agent' && agentBusy}
             onClick={step.action}
-            className="cos-panel rounded-2xl p-4 text-left hover:border-amber-500/30 border border-transparent transition"
+            className="cos-panel rounded-2xl p-4 text-left hover:border-amber-500/30 border border-transparent transition disabled:opacity-50"
           >
             <div className="text-[10px] uppercase tracking-wider text-amber-200/60 mb-1">{step.title}</div>
             <p className="text-sm text-[#9aa8bc]">{step.blurb}</p>
           </button>
         ))}
       </div>
+      {agentNote && (
+        <div className="cos-panel rounded-lg px-4 py-2 text-sm text-emerald-200">{agentNote}</div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 cos-panel rounded-2xl p-5">

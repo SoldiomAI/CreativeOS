@@ -13,6 +13,11 @@ import {
   PublishRoute,
   ReachPlatform,
 } from './connectorService';
+import {
+  isYoutubeAgentConfigured,
+  pingYoutubeAgent,
+  queueYoutubeAgentFromCreativeOs,
+} from './youtubeAgentService';
 
 export type PlatformPublishStatus = 'idle' | 'uploading' | 'sharing' | 'done' | 'error' | 'skipped';
 
@@ -204,6 +209,30 @@ export const publishForReal = async (opts: RealPublishOptions): Promise<{
       });
     }
     if (avail.scheduler) steps.push(schedulerStep('youtube', opts.campaign.youtube));
+    if (isYoutubeAgentConfigured()) {
+      steps.push({
+        route: 'youtube-agent',
+        run: async () => {
+          opts.onPlatform?.('youtube', 'uploading', 'Handing topic to YouTube Automation Agent…');
+          const health = await pingYoutubeAgent();
+          if (!health.ok) throw new Error(health.message || 'YouTube Agent unreachable');
+          const result = await queueYoutubeAgentFromCreativeOs({
+            prompt: opts.prompt,
+            hook: opts.hook,
+            meta: opts.campaign.youtube,
+          });
+          const msg = result.scheduledFor
+            ? `Agent queued "${result.title}" for ${new Date(result.scheduledFor).toLocaleString()}`
+            : `Agent pipeline started: "${result.title}" (contentId ${result.contentId})`;
+          return {
+            platform: 'youtube' as const,
+            status: 'done' as const,
+            via: 'youtube-agent' as const,
+            message: `${msg} — agent generates its own video via Gemini (see dashboard :3456)`,
+          };
+        },
+      });
+    }
     if (avail.mcp) steps.push(mcpStep('youtube', opts.campaign.youtube));
     steps.push(manualStep('youtube', opts.campaign.youtube));
 

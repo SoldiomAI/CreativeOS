@@ -550,6 +550,7 @@ const Studio: React.FC = () => {
                 return [
                   chip('YouTube API', Boolean(getGoogleOAuthClientId())),
                   chip('Scheduler API', a.scheduler),
+                  chip('YouTube Agent', a.youtubeAgent),
                   chip('MCP/Webhook', a.mcp),
                   chip('Share sheet', a.share),
                   chip('CLI + Manual', true),
