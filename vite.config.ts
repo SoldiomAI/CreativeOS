@@ -35,6 +35,12 @@ export default defineConfig(({ mode }) => {
             changeOrigin: true,
             rewrite: (p) => p.replace(/^\/api\/wangp/, '/api/wangp'),
           },
+          // SOLDIOM Content Factory (FastAPI soldiom-content-factory)
+          '/api/scf': {
+            target: 'http://127.0.0.1:7870',
+            changeOrigin: true,
+            rewrite: (p) => p.replace(/^\/api\/scf/, '/api/scf'),
+          },
         },
       },
       preview: {
@@ -63,6 +69,12 @@ export default defineConfig(({ mode }) => {
             target: 'http://127.0.0.1:7867',
             changeOrigin: true,
             rewrite: (p) => p.replace(/^\/api\/wangp/, '/api/wangp'),
+          },
+          // SOLDIOM Content Factory (FastAPI soldiom-content-factory)
+          '/api/scf': {
+            target: 'http://127.0.0.1:7870',
+            changeOrigin: true,
+            rewrite: (p) => p.replace(/^\/api\/scf/, '/api/scf'),
           },
         },
       },

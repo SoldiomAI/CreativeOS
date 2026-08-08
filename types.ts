@@ -49,6 +49,7 @@ export interface VideoGenerationRequest {
 
 export enum AppTab {
   DASHBOARD = 'DASHBOARD',
+  CONTENT_FACTORY = 'CONTENT_FACTORY',
   STUDIO = 'STUDIO',
   STILLS = 'STILLS',
   LIBRARY = 'LIBRARY',

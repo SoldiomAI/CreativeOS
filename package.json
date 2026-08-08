@@ -8,6 +8,8 @@
     "dev:all": "node server/payment-api.mjs & vite --port 5173 --host 0.0.0.0",
     "payment-api": "node server/payment-api.mjs",
     "wangp-bridge": "python3 server/wangp-bridge.py",
+    "content-factory": "cd soldiom-content-factory && python3 -m uvicorn api.main:app --host 0.0.0.0 --port 7870",
+    "content-factory:cli": "python3 soldiom-content-factory/cli.py",
     "build": "vite build",
     "preview": "vite preview --port 4173 --host 0.0.0.0",
     "typecheck": "tsc --noEmit"

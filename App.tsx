@@ -66,8 +66,28 @@ import {
   setWan2gpModelType,
   setWan2gpSettingsJson,
 } from './services/wan2gpService';
+import ContentFactory from './components/ContentFactory';
 import BillingPanel from './components/BillingPanel';
 import { AppTab } from './types';
+import { setContentFactorySeed } from './services/appFlow';
+import {
+  getScfApiBase,
+  pingContentFactory,
+  setScfApiBase,
+} from './services/contentFactoryService';
+import {
+  DEPLOYMENT_MODES,
+  getDeploymentMode,
+  getElevenlabsApiKey,
+  getGcpCloudRunUrl,
+  getRunpodApiKey,
+  getRunpodEndpointId,
+  setDeploymentMode,
+  setElevenlabsApiKey,
+  setGcpCloudRunUrl,
+  setRunpodApiKey,
+  setRunpodEndpointId,
+} from './services/deploymentModeService';
 
 export default function App() {
   const [hasStarted, setHasStarted] = useState(false);
@@ -96,6 +116,13 @@ export default function App() {
   const [wangpModel, setWangpModelState] = useState(getWan2gpModelType());
   const [wangpSettings, setWangpSettingsState] = useState(getWan2gpSettingsJson());
   const [wangpStatus, setWangpStatus] = useState<'unknown' | 'up' | 'down'>('unknown');
+  const [scfStatus, setScfStatus] = useState<'unknown' | 'up' | 'down'>('unknown');
+  const [scfApiBase, setScfApiBaseState] = useState(getScfApiBase());
+  const [scfDeployMode, setScfDeployModeState] = useState(getDeploymentMode());
+  const [runpodKey, setRunpodKeyState] = useState(getRunpodApiKey());
+  const [runpodEndpoint, setRunpodEndpointState] = useState(getRunpodEndpointId());
+  const [gcpRunUrl, setGcpRunUrlState] = useState(getGcpCloudRunUrl());
+  const [elevenKey, setElevenKeyState] = useState(getElevenlabsApiKey());
   const [studioSessionKey, setStudioSessionKey] = useState(0);
   const [billingNotice, setBillingNotice] = useState<string | null>(null);
 
@@ -113,6 +140,11 @@ export default function App() {
     setActiveTab(AppTab.STUDIO);
   };
 
+  const goContentFactoryCreate = (seed?: Parameters<typeof setContentFactorySeed>[0]) => {
+    if (seed) setContentFactorySeed(seed);
+    setActiveTab(AppTab.CONTENT_FACTORY);
+  };
+
   useEffect(() => {
     if (activeTab !== AppTab.SETTINGS) return;
     pingComfyUi()
@@ -124,7 +156,10 @@ export default function App() {
     pingWan2gp()
       .then((h) => setWangpStatus(h.ready ? 'up' : h.ok ? 'down' : 'down'))
       .catch(() => setWangpStatus('down'));
-  }, [activeTab, comfyUrl, ytAgentUrl, wangpModel]);
+    pingContentFactory()
+      .then((h) => setScfStatus(h.ok ? 'up' : 'down'))
+      .catch(() => setScfStatus('down'));
+  }, [activeTab, comfyUrl, ytAgentUrl, wangpModel, scfApiBase]);
 
   useEffect(() => {
     void handleBillingReturn().then((result) => {
@@ -156,8 +191,14 @@ export default function App() {
             </div>
           )}
           {activeTab === AppTab.DASHBOARD && (
-            <Dashboard onNavigate={goTab} onStudioCreate={goStudioCreate} onStudioPublish={goStudioPublish} />
+            <Dashboard
+              onNavigate={goTab}
+              onStudioCreate={goStudioCreate}
+              onStudioPublish={goStudioPublish}
+              onContentFactoryCreate={goContentFactoryCreate}
+            />
           )}
+          {activeTab === AppTab.CONTENT_FACTORY && <ContentFactory />}
           {activeTab === AppTab.STUDIO && <Studio key={studioSessionKey} />}
           {activeTab === AppTab.STILLS && (
             <EditorTool
@@ -577,6 +618,116 @@ export default function App() {
               </section>
 
               <section className="space-y-3 border border-gray-700 rounded-xl p-4 bg-gray-800/40">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-white font-semibold">
+                    SOLDIOM Content Factory{' '}
+                    <span className="text-cyan-400 text-xs font-normal">deterministic studio</span>
+                  </h3>
+                  <span
+                    className={`text-[10px] font-mono uppercase ${
+                      scfStatus === 'up'
+                        ? 'text-emerald-400'
+                        : scfStatus === 'down'
+                          ? 'text-rose-400'
+                          : 'text-gray-500'
+                    }`}
+                  >
+                    {scfStatus === 'up' ? 'ready' : scfStatus === 'down' ? 'offline' : '…'}
+                  </span>
+                </div>
+                <p className="text-gray-400 text-sm">
+                  Universal content pipeline: research → strategy → storyboard → Pillow render → QA →
+                  export pack. Deploy: <span className="text-gray-200">local</span>,{' '}
+                  <span className="text-gray-200">RunPod</span>, or{' '}
+                  <span className="text-gray-200">GCP Cloud Run</span>.
+                </p>
+                <label className="block text-xs text-gray-500 font-mono uppercase">API base</label>
+                <input
+                  value={scfApiBase}
+                  onChange={(e) => {
+                    setScfApiBaseState(e.target.value);
+                    setScfApiBase(e.target.value);
+                  }}
+                  placeholder="/api/scf"
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-cyan-500"
+                />
+                <label className="block text-xs text-gray-500 font-mono uppercase">Deploy mode</label>
+                <select
+                  value={scfDeployMode}
+                  onChange={(e) => {
+                    const v = e.target.value as typeof scfDeployMode;
+                    setScfDeployModeState(v);
+                    setDeploymentMode(v);
+                  }}
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white"
+                >
+                  {DEPLOYMENT_MODES.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label} — {m.blurb}
+                    </option>
+                  ))}
+                </select>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 font-mono uppercase mb-1">
+                      RunPod API key
+                    </label>
+                    <input
+                      type="password"
+                      value={runpodKey}
+                      onChange={(e) => {
+                        setRunpodKeyState(e.target.value);
+                        setRunpodApiKey(e.target.value);
+                      }}
+                      className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 font-mono uppercase mb-1">
+                      RunPod endpoint ID
+                    </label>
+                    <input
+                      value={runpodEndpoint}
+                      onChange={(e) => {
+                        setRunpodEndpointState(e.target.value);
+                        setRunpodEndpointId(e.target.value);
+                      }}
+                      className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white"
+                    />
+                  </div>
+                </div>
+                <label className="block text-xs text-gray-500 font-mono uppercase">
+                  GCP Cloud Run URL
+                </label>
+                <input
+                  value={gcpRunUrl}
+                  onChange={(e) => {
+                    setGcpRunUrlState(e.target.value);
+                    setGcpCloudRunUrl(e.target.value);
+                  }}
+                  placeholder="https://your-service-xyz.run.app"
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white"
+                />
+                <label className="block text-xs text-gray-500 font-mono uppercase">
+                  ElevenLabs API key (voice)
+                </label>
+                <input
+                  type="password"
+                  value={elevenKey}
+                  onChange={(e) => {
+                    setElevenKeyState(e.target.value);
+                    setElevenlabsApiKey(e.target.value);
+                  }}
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white"
+                />
+                <p className="text-xs text-gray-500">
+                  Start API:{' '}
+                  <code className="text-gray-300">npm run content-factory</code> · CLI:{' '}
+                  <code className="text-gray-300">python3 soldiom-content-factory/cli.py create &quot;…&quot;</code>
+                </p>
+              </section>
+
+              <section className="space-y-3 border border-gray-700 rounded-xl p-4 bg-gray-800/40">
                 <h3 className="text-white font-semibold">
                   Duix.Avatar{' '}
                   <a
@@ -699,6 +850,10 @@ export default function App() {
                       Wan2GP
                     </a>{' '}
                     — local GPU video (Wan 2.1/2.2, LTX-2, Hunyuan, Flux) via bridge on :7867
+                  </li>
+                  <li>
+                    <span className="text-cyan-400">SOLDIOM Content Factory</span> — deterministic
+                    carousels/reels/decks (Pillow RTL, Playwright, ElevenLabs) · local / RunPod / GCP
                   </li>
                   <li>
                     <a

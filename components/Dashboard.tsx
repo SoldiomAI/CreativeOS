@@ -8,6 +8,7 @@ import { getConnectorAvailability } from '../services/connectorService';
 import { getGoogleOAuthClientId } from '../services/youtubeService';
 import { generateViaYoutubeAgent, pingYoutubeAgent } from '../services/youtubeAgentService';
 import { pingWan2gp } from '../services/wan2gpService';
+import { pingContentFactory } from '../services/contentFactoryService';
 import { getCredits, isPro } from '../services/creditsStore';
 import { pingBillingApi } from '../services/paymentService';
 import { AppTab } from '../types';
@@ -16,9 +17,15 @@ interface DashboardProps {
   onNavigate?: (tab: AppTab) => void;
   onStudioCreate?: (seed?: StudioSeed) => void;
   onStudioPublish?: (libraryItemId: string) => void;
+  onContentFactoryCreate?: (seed?: { prompt?: string; url?: string; goal?: string }) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onStudioCreate, onStudioPublish }) => {
+const Dashboard: React.FC<DashboardProps> = ({
+  onNavigate,
+  onStudioCreate,
+  onStudioPublish,
+  onContentFactoryCreate,
+}) => {
   const [total, setTotal] = useState(0);
   const [withAudio, setWithAudio] = useState(0);
   const [godCount, setGodCount] = useState(0);
@@ -30,6 +37,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onStudioCreate, onStu
   const [billingOk, setBillingOk] = useState(false);
   const [ytAgentOk, setYtAgentOk] = useState(false);
   const [wangpOk, setWangpOk] = useState(false);
+  const [scfOk, setScfOk] = useState(false);
   const [agentBusy, setAgentBusy] = useState(false);
   const [agentNote, setAgentNote] = useState<string | null>(null);
 
@@ -46,6 +54,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onStudioCreate, onStu
     pingBillingApi().then((h) => setBillingOk(h.ok && h.stripe));
     pingYoutubeAgent().then((h) => setYtAgentOk(h.ok && Boolean(h.initialized)));
     pingWan2gp().then((h) => setWangpOk(Boolean(h.ready)));
+    pingContentFactory().then((h) => setScfOk(Boolean(h.ok)));
     setCredits(getCredits());
   }, []);
 
@@ -58,6 +67,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onStudioCreate, onStu
     { label: 'MCP bridge', on: reach.mcp },
     { label: 'YouTube Agent', on: ytAgentOk },
     { label: 'Wan2GP GPU', on: wangpOk },
+    { label: 'Content Factory', on: scfOk },
     { label: 'God Mode', on: getGodModeEnabled() },
     { label: 'Billing API', on: billingOk },
   ];
@@ -80,6 +90,23 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onStudioCreate, onStu
       blurb: 'Prompt + images → movie + sound',
       tab: AppTab.STUDIO,
       action: () => onStudioCreate?.(),
+    },
+    {
+      title: 'Content Factory',
+      blurb: 'Deterministic carousels, reels, decks — research → render → QA',
+      tab: AppTab.CONTENT_FACTORY,
+      action: () => {
+        const topic =
+          recent[0]?.prompt ||
+          window.prompt('Topic for SOLDIOM Content Factory:') ||
+          '';
+        if (!topic.trim()) {
+          onNavigate?.(AppTab.CONTENT_FACTORY);
+          return;
+        }
+        onContentFactoryCreate?.({ prompt: topic.trim(), goal: 'viral' });
+        onNavigate?.(AppTab.CONTENT_FACTORY);
+      },
     },
     {
       title: 'YouTube Agent',

@@ -23,8 +23,19 @@ export type DistributeSeed = {
   libraryItemId: string;
 };
 
+/** Seed for SOLDIOM Content Factory universal intake. */
+export type ContentFactorySeed = {
+  prompt?: string;
+  url?: string;
+  repo?: string;
+  brand?: string;
+  language?: 'ar' | 'en' | 'bilingual';
+  goal?: string;
+};
+
 let studioSeed: StudioSeed | null = null;
 let distributeSeed: DistributeSeed | null = null;
+let contentFactorySeed: ContentFactorySeed | null = null;
 
 export const setStudioSeed = (seed: StudioSeed) => {
   studioSeed = seed;
@@ -45,5 +56,15 @@ export const setDistributeSeed = (seed: DistributeSeed) => {
 export const takeDistributeSeed = (): DistributeSeed | null => {
   const seed = distributeSeed;
   distributeSeed = null;
+  return seed;
+};
+
+export const setContentFactorySeed = (seed: ContentFactorySeed) => {
+  contentFactorySeed = seed;
+};
+
+export const takeContentFactorySeed = (): ContentFactorySeed | null => {
+  const seed = contentFactorySeed;
+  contentFactorySeed = null;
   return seed;
 };

@@ -47,8 +47,11 @@ View the original AI Studio shell: https://ai.studio/apps/drive/1tuNPhOa8D1Xc0RS
 | **Factory** | Hook Foundry → Prompt→Movie (all providers, God Mode) → save to Library | Still Lab seeds, Caption Studio |
 | **Library** | IndexedDB movies, publish ledger, **Publish** / **Remix** | Caption Studio, Factory |
 | **Links** | All connectors + **Billing (Stripe)** | Every publish route |
+| **Content** | SOLDIOM Content Factory — deterministic carousels, reels, decks | Research → render → QA → export |
 
 Flow: **Still Lab → Factory → Library → Caption Studio → YouTube / Scheduler / MCP / CLI / manual**
+
+**Content Factory flow:** **Idea/URL/GitHub → Research → Strategy → Storyboard → Deterministic render → QA → Content pack**
 
 4. Paste tokens in **Links** (browser `localStorage` only — not bundled):
    - Free HF token for Spaces / Inference
@@ -105,6 +108,34 @@ npm run wangp-bridge   # :7867, proxied at /api/wangp
 ```
 
 Set `model_type` in **Links** (or export settings JSON from WanGP UI). Factory provider **Wan2GP (local GPU)** or **Auto** when the bridge is ready. Generation can take several minutes on consumer GPUs.
+
+### SOLDIOM Content Factory (deterministic studio)
+
+**Intelligence decides what to say; the renderer draws reproducible pixels** — no generative image models for core slides, Arabic text, charts, or logos.
+
+```bash
+pip install -r soldiom-content-factory/requirements.txt
+npm run content-factory          # FastAPI on :7870, proxied at /api/scf
+npm run dev                      # open Content tab in the app
+```
+
+**Deploy modes** (Links → Content Factory, or `SCF_DEPLOY_MODE`):
+
+| Mode | Use case |
+| --- | --- |
+| **local** | Projects on disk + Pillow/FFmpeg on this machine |
+| **runpod** | Metadata local; GPU render via RunPod serverless (`RUNPOD_API_KEY`, `RUNPOD_ENDPOINT_ID`) |
+| **gcp** | Cloud Run worker (`GCP_CLOUD_RUN_URL`) + optional GCS bucket |
+
+**CLI:**
+
+```bash
+npm run content-factory:cli -- create "Explain sovereign AI for GCC" --language ar --format carousel,reel
+```
+
+**Pipeline:** Director → Research → Strategy → Script → Storyboard → Design (Pillow RTL via libraqm) → Voice (ElevenLabs) → Render → QA → Export pack.
+
+Optional: Playwright for website captures (`pip install playwright && playwright install chromium`).
 
 ## Quality checks
 
