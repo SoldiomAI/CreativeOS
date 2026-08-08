@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://soldiom.example/schemas/scene-ir.schema.json",
+  "title": "SOLDIOM Creator OS Scene IR",
+  "type": "object",
+  "required": ["id", "purpose", "language", "direction", "elements"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "purpose": { "type": "string", "minLength": 1 },
+    "durationSeconds": { "type": "number", "exclusiveMinimum": 0 },
+    "language": { "type": "string", "minLength": 2 },
+    "direction": { "enum": ["rtl", "ltr"] },
+    "transition": { "type": "string" },
+    "elements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "component"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "component": { "type": "string", "minLength": 1 },
+          "content": { "type": "string" },
+          "rtl": { "type": "boolean" },
+          "data": { "type": "object", "additionalProperties": true },
+          "claimIds": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "uniqueItems": true
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
