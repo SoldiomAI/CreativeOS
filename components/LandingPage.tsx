@@ -1,107 +1,84 @@
-import React, { useState, useEffect, useRef } from 'react';
-
-const slides = [
-  {
-    video: 'https://assets.mixkit.co/videos/preview/mixkit-a-woman-in-a-white-dress-and-a-hat-walking-in-a-field-of-41221-large.mp4',
-    title: <>AdWords for <br/> <span className="text-cyan-400">Culture</span></>
-  },
-  {
-    video: 'https://assets.mixkit.co/videos/preview/mixkit-fast-shot-of-a-pizza-being-prepared-in-a-kitchen-4208-large.mp4',
-    title: <>Self-Optimizing <br/> <span className="text-blue-400">Media Factory</span></>
-  },
-  {
-    video: 'https://assets.mixkit.co/videos/preview/mixkit-a-man-in-a-suit-talking-on-the-phone-32833-large.mp4',
-    title: <>Zero-to-Publish <br/> in <span className="text-white underline decoration-cyan-400">5 Minutes</span></>
-  },
-  {
-    video: 'https://assets.mixkit.co/videos/preview/mixkit-a-person-in-a-gorilla-suit-walking-in-a-forest-41988-large.mp4',
-    title: <>Powered By <br/> Gemini <span className="text-cyan-400">Veo 3.1</span></>
-  },
-];
+import React from 'react';
 
 interface LandingPageProps {
   onGetStarted: () => void;
 }
 
+const principles = [
+  ['AI THINKS', 'Research, reason, write, localize and plan.'],
+  ['CODE DRAWS', 'Pillow, SVG, HTML/Chromium and procedural graphics render the pixels.'],
+  ['EVIDENCE VERIFIES', 'Claims remain traceable to sources and freshness policies.'],
+  ['QA APPROVES', 'RTL, layout, accessibility, licensing and provenance gate release.'],
+];
+
 const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const timeoutRef = useRef<number | null>(null);
-
-  const resetTimeout = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-  };
-
-  useEffect(() => {
-    resetTimeout();
-    timeoutRef.current = window.setTimeout(
-      () =>
-        setCurrentIndex((prevIndex) =>
-          prevIndex === slides.length - 1 ? 0 : prevIndex + 1
-        ),
-      4000
-    );
-
-    return () => {
-      resetTimeout();
-    };
-  }, [currentIndex]);
-
-  const goToSlide = (slideIndex: number) => {
-    setCurrentIndex(slideIndex);
-  };
-
   return (
-    <div className="w-full max-w-md mx-auto flex flex-col h-[95vh] justify-between text-center p-6 animate-fade-in">
-      <div className="flex-grow flex flex-col justify-center">
-        <div className="mb-8">
-             <h1 className="text-xs font-mono uppercase tracking-[0.3em] text-gray-400 mb-2">Performance Creative OS</h1>
-        </div>
-        <div className="relative w-full aspect-[9/16] rounded-[32px] overflow-hidden shadow-2xl ring-1 ring-white/20">
-          <div className="w-full h-full flex transition-transform duration-700 ease-in-out" style={{ transform: `translateX(-${currentIndex * 100}%)` }}>
-            {slides.map((slide, index) => (
-              <div key={index} className="w-full h-full flex-shrink-0 relative">
-                <video
-                  src={slide.video}
-                  className="w-full h-full object-cover"
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent opacity-90"></div>
-                <div className="absolute bottom-12 left-0 right-0 px-6 text-left">
-                    <h2 className="text-white text-4xl font-bold leading-none tracking-tight drop-shadow-lg">
-                    {slide.title}
-                    </h2>
-                </div>
-              </div>
-            ))}
+    <div className="min-h-screen bg-[#080b10] text-white overflow-hidden relative">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute -top-40 right-[-10%] w-[700px] h-[700px] rounded-full bg-cyan-500/10 blur-[140px]" />
+        <div className="absolute -bottom-40 left-[-10%] w-[700px] h-[700px] rounded-full bg-purple-500/10 blur-[140px]" />
+        <div className="absolute inset-0 opacity-[0.08]" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.12) 1px, transparent 1px)', backgroundSize: '36px 36px' }} />
+      </div>
+
+      <main className="relative z-10 max-w-7xl mx-auto px-6 py-10 md:py-16">
+        <nav className="flex items-center justify-between mb-20">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white text-black font-black grid place-items-center">S</div>
+            <div>
+              <div className="font-black tracking-tight">SOLDIOM</div>
+              <div className="text-[10px] text-gray-500 uppercase tracking-[0.3em]">Creator OS</div>
+            </div>
           </div>
-        </div>
-        
-        <div className="flex justify-center space-x-2 mt-8">
-          {slides.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => goToSlide(index)}
-              className={`h-1 rounded-full transition-all duration-300 ${currentIndex === index ? 'bg-cyan-400 w-8' : 'bg-gray-600 w-2 hover:bg-gray-500'}`}
-              aria-label={`Go to slide ${index + 1}`}
-            />
+          <span className="hidden sm:inline-flex px-3 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-[10px] font-mono tracking-widest">NO GENERATIVE VISUALS</span>
+        </nav>
+
+        <section className="grid lg:grid-cols-[1.25fr_.75fr] gap-12 items-center">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-cyan-500/20 bg-cyan-500/10 text-cyan-300 text-xs font-mono mb-6">
+              DETERMINISTIC CONTENT INTELLIGENCE SYSTEM
+            </div>
+            <h1 className="text-5xl md:text-7xl font-black leading-[0.96] tracking-[-0.045em]">
+              One idea.<br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-white to-purple-300">An entire media company.</span>
+            </h1>
+            <p className="mt-7 text-lg md:text-xl text-gray-400 max-w-3xl leading-relaxed">
+              Research, verify, structure, script, typeset, animate, narrate, reflow and quality-gate content for any format — with every important visual rendered deterministically by code.
+            </p>
+            <div className="mt-8 flex flex-col sm:flex-row gap-3">
+              <button onClick={onGetStarted} className="px-6 py-3.5 rounded-xl bg-white text-black font-black hover:bg-cyan-100 transition">Open Creator Command Center</button>
+              <a href="https://github.com/Soldiom/CreativeOS" className="px-6 py-3.5 rounded-xl border border-gray-700 bg-gray-900/50 text-white font-semibold hover:border-gray-500 transition text-center">Repository</a>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-gray-700/80 bg-gray-900/70 backdrop-blur-xl p-5 shadow-2xl">
+            <div className="flex items-center justify-between pb-4 border-b border-gray-800">
+              <div>
+                <div className="font-bold">Creator Compiler</div>
+                <div className="text-xs text-gray-500 font-mono">PROJECT → MASTER OUTPUTS</div>
+              </div>
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_20px_rgba(52,211,153,.8)]" />
+            </div>
+            <div className="py-5 space-y-2 text-sm font-mono">
+              {['Intent IR', 'Evidence IR', 'Strategy IR', 'Narrative IR', 'Scene IR', 'Render IR', 'Distribution IR', 'Performance IR'].map((item, index) => (
+                <div key={item} className="flex items-center gap-3 rounded-lg border border-gray-800 bg-black/20 px-3 py-2.5">
+                  <span className="text-gray-600">{String(index + 1).padStart(2, '0')}</span>
+                  <span className="text-gray-200">{item}</span>
+                  <span className="ml-auto text-emerald-400">✓</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="grid md:grid-cols-2 xl:grid-cols-4 gap-4 mt-20">
+          {principles.map(([title, detail]) => (
+            <div key={title} className="rounded-2xl border border-gray-800 bg-gray-900/40 p-5">
+              <div className="text-sm font-black tracking-[0.14em] text-white">{title}</div>
+              <p className="text-sm text-gray-500 leading-relaxed mt-3">{detail}</p>
+            </div>
           ))}
-        </div>
-      </div>
-      
-      <div className="pb-4">
-        <button 
-            onClick={onGetStarted} 
-            className="w-full bg-white text-black font-bold py-4 px-4 rounded-xl text-lg hover:bg-gray-200 active:scale-95 transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)]"
-        >
-          Enter System
-        </button>
-        <p className="mt-4 text-xs text-gray-500">v2.1.0 • Powered by Google GenAI</p>
-      </div>
+        </section>
+      </main>
     </div>
   );
 };
