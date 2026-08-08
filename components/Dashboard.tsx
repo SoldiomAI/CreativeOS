@@ -1,79 +1,73 @@
 import React from 'react';
 
-const StatCard = ({ title, value, change, trend }: { title: string, value: string, change: string, trend: 'up' | 'down' | 'neutral' }) => (
-  <div className="bg-gray-800/50 border border-gray-700 p-4 rounded-lg backdrop-blur-sm">
-    <h3 className="text-gray-400 text-xs font-mono uppercase tracking-widest mb-1">{title}</h3>
-    <div className="flex items-end justify-between">
-      <span className="text-2xl font-bold text-white">{value}</span>
-      <span className={`text-sm font-mono ${trend === 'up' ? 'text-green-400' : trend === 'down' ? 'text-red-400' : 'text-gray-400'}`}>
-        {change}
-      </span>
-    </div>
+const StatCard = ({ title, value, detail }: { title: string; value: string; detail: string }) => (
+  <div className="rounded-2xl border border-gray-800 bg-gray-900/50 p-4">
+    <div className="text-[11px] uppercase tracking-[0.18em] text-gray-500">{title}</div>
+    <div className="text-2xl font-black text-white mt-2">{value}</div>
+    <div className="text-xs text-gray-500 mt-1">{detail}</div>
   </div>
 );
 
 const Dashboard: React.FC = () => {
+  const systems = [
+    ['Evidence Graph', 'Source → claim → content → scene traceability', 'READY'],
+    ['Arabic Core', 'RTL shaping, bidi, mixed-language and snapshot gates', 'SPEC'],
+    ['Renderer Abstraction', 'Pillow / SVG / HTML / browser / procedural 3D', 'SPEC'],
+    ['Release Gates', 'Evidence, layout, accessibility, licensing, provenance', 'SPEC'],
+    ['Learning Loop', 'Analytics + experiments without false causal claims', 'SPEC'],
+  ];
+
   return (
-    <div className="h-full flex flex-col gap-6 overflow-y-auto p-1">
-      <div className="flex justify-between items-center mb-2">
-        <div>
-            <h2 className="text-2xl font-bold text-white tracking-tight">Audit Report</h2>
-            <p className="text-gray-400 text-sm">System Status: <span className="text-green-400">OPTIMIZED</span></p>
-        </div>
-        <div className="flex space-x-2">
-            <span className="px-3 py-1 rounded-full bg-blue-900/30 text-blue-400 border border-blue-800 text-xs font-mono">VEO-3.1: ACTIVE</span>
-            <span className="px-3 py-1 rounded-full bg-purple-900/30 text-purple-400 border border-purple-800 text-xs font-mono">FLASH-2.5: ACTIVE</span>
-        </div>
-      </div>
+    <div className="h-full overflow-y-auto pr-1">
+      <div className="max-w-7xl mx-auto pb-10 space-y-6">
+        <header>
+          <div className="text-xs font-mono text-cyan-300 tracking-[0.2em] uppercase">SOLDIOM Creator OS</div>
+          <h2 className="text-3xl font-black text-white mt-2">Command Center</h2>
+          <p className="text-gray-500 mt-2">Control plane for a deterministic, evidence-backed media company.</p>
+        </header>
 
-      {/* KPI Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Est. Viral Coefficient" value="1.42" change="+12.5%" trend="up" />
-        <StatCard title="Production Velocity" value="8m 12s" change="-30s" trend="up" />
-        <StatCard title="Model Drift" value="0.03%" change="Stable" trend="neutral" />
-        <StatCard title="Content Variance" value="High" change="Risk: Low" trend="up" />
-      </div>
+        <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <StatCard title="Visual policy" value="Deterministic" detail="Generative image/video path removed" />
+          <StatCard title="Compiler stages" value="9 IRs" detail="Intent through learning" />
+          <StatCard title="Default evidence" value="Strict" detail="Public claims require traceable support" />
+          <StatCard title="Primary languages" value="AR + EN" detail="Arabic is first-class infrastructure" />
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-grow">
-        {/* Trend Radar */}
-        <div className="lg:col-span-2 bg-gray-800/30 border border-gray-700 rounded-xl p-6">
-          <h3 className="text-white font-bold mb-4 flex items-center">
-            <svg className="w-5 h-5 mr-2 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-            Trend Radar (Real-time)
-          </h3>
-          <div className="space-y-4">
-            {[
-                { topic: "ASMR Unboxing", growth: 94, sentiment: "Positive" },
-                { topic: "AI Tutorials", growth: 88, sentiment: "Neutral" },
-                { topic: "Sustainable Fashion", growth: 76, sentiment: "Positive" },
-                { topic: "Retro Tech", growth: 62, sentiment: "Rising" }
-            ].map((item, i) => (
-                <div key={i} className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg border-l-2 border-cyan-500 hover:bg-gray-700/50 transition cursor-pointer">
-                    <span className="text-gray-200 font-medium">{item.topic}</span>
-                    <div className="flex items-center space-x-4">
-                        <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
-                            <div className="h-full bg-gradient-to-r from-blue-500 to-cyan-400" style={{ width: `${item.growth}%` }}></div>
-                        </div>
-                        <span className="text-cyan-400 font-mono text-sm">{item.growth}%</span>
-                    </div>
+        <div className="grid xl:grid-cols-[1.4fr_.6fr] gap-6">
+          <section className="rounded-2xl border border-gray-800 bg-gray-900/50 p-5">
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <div>
+                <h3 className="font-bold text-white">System architecture</h3>
+                <p className="text-sm text-gray-500">Implementation tracks now defined in the repository spec.</p>
+              </div>
+              <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-[10px] font-mono">GOD MODE BRANCH</span>
+            </div>
+            <div className="space-y-2">
+              {systems.map(([name, detail, status]) => (
+                <div key={name} className="rounded-xl border border-gray-800 bg-black/20 p-4 flex gap-4 items-start">
+                  <div className="w-9 h-9 rounded-lg bg-cyan-500/10 border border-cyan-500/20 grid place-items-center text-cyan-300 font-mono text-xs">✓</div>
+                  <div className="min-w-0">
+                    <div className="font-semibold text-gray-100">{name}</div>
+                    <div className="text-xs text-gray-500 mt-1">{detail}</div>
+                  </div>
+                  <span className="ml-auto text-[10px] font-mono text-gray-500">{status}</span>
                 </div>
-            ))}
-          </div>
-        </div>
+              ))}
+            </div>
+          </section>
 
-        {/* Quick Actions / System Log */}
-        <div className="bg-gray-800/30 border border-gray-700 rounded-xl p-6 flex flex-col">
-           <h3 className="text-white font-bold mb-4">System Log</h3>
-           <div className="flex-grow space-y-3 text-xs font-mono text-gray-400 overflow-hidden">
-                <div className="flex gap-2"><span className="text-blue-500">10:42:01</span> <span>Batch #492 completed.</span></div>
-                <div className="flex gap-2"><span className="text-blue-500">10:41:55</span> <span>Optimizing thumbnails...</span></div>
-                <div className="flex gap-2"><span className="text-blue-500">10:41:12</span> <span>Veo inference started.</span></div>
-                <div className="flex gap-2"><span className="text-blue-500">10:40:05</span> <span>Hook Foundry: 3 concepts generated.</span></div>
-                <div className="flex gap-2"><span className="text-blue-500">10:39:22</span> <span>Ingesting market signals...</span></div>
-           </div>
-           <button className="mt-4 w-full py-2 border border-gray-600 text-gray-300 hover:text-white hover:border-gray-400 rounded transition text-xs uppercase tracking-wider">
-             View Full Logs
-           </button>
+          <section className="rounded-2xl border border-gray-800 bg-gray-900/50 p-5">
+            <h3 className="font-bold text-white">Release constitution</h3>
+            <p className="text-sm text-gray-500 mt-1 mb-4">Master outputs remain blocked until critical gates pass.</p>
+            <div className="space-y-3 text-sm">
+              {['Evidence', 'Arabic / RTL', 'Layout', 'Accessibility', 'Licensing', 'Audio / Video', 'Provenance', 'Reproducibility'].map((gate) => (
+                <div key={gate} className="flex items-center justify-between border-b border-gray-800 pb-2 last:border-0">
+                  <span className="text-gray-300">{gate}</span>
+                  <span className="text-amber-300 text-[10px] font-mono">GATED</span>
+                </div>
+              ))}
+            </div>
+          </section>
         </div>
       </div>
     </div>
