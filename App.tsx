@@ -7,7 +7,7 @@ import Library from './components/Library';
 import Settings from './components/Settings';
 import { AppTab } from './types';
 import { I18nProvider, useI18n } from './i18n';
-import { isDemoMode, navigateTo } from './services/config';
+import { isDemoMode, navigateTo, hasStarted as loadStarted, setStarted } from './services/config';
 
 const DemoBanner: React.FC = () => {
   const { t } = useI18n();
@@ -36,13 +36,19 @@ const DemoBanner: React.FC = () => {
 };
 
 function Shell() {
-  const [hasStarted, setHasStarted] = useState(false);
+  const [hasStarted, setHasStarted] = useState(loadStarted());
   const [activeTab, setActiveTab] = useState<AppTab>(AppTab.DASHBOARD);
+
+  const start = () => {
+    setStarted();
+    setHasStarted(true);
+  };
 
   useEffect(() => {
     const handler = (e: Event) => {
       const tab = (e as CustomEvent<string>).detail;
       if (tab && tab in AppTab) {
+        setStarted();
         setHasStarted(true);
         setActiveTab(AppTab[tab as keyof typeof AppTab]);
       }
@@ -56,7 +62,7 @@ function Shell() {
       <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop')] bg-cover bg-center">
         <div className="absolute inset-0 bg-gray-900/90 backdrop-blur-sm"></div>
         <div className="relative z-10 w-full h-full">
-            <LandingPage onGetStarted={() => setHasStarted(true)} />
+            <LandingPage onGetStarted={start} />
         </div>
       </div>
     );

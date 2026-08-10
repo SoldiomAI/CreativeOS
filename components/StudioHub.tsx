@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Studio from './Studio';
 import EditorTool from './EditorTool';
 import WriteTool from './tools/WriteTool';
@@ -50,6 +50,17 @@ const StudioHub: React.FC = () => {
   const { t } = useI18n();
   const [activeTool, setActiveTool] = useState<ToolId | null>(null);
   const [voiceScript, setVoiceScript] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const tool = (e as CustomEvent<string>).detail;
+      if (tool === 'write' || tool === 'design' || tool === 'voice' || tool === 'video') {
+        setActiveTool(tool);
+      }
+    };
+    window.addEventListener('creativeos:studio-tool', handler);
+    return () => window.removeEventListener('creativeos:studio-tool', handler);
+  }, []);
 
   if (activeTool) {
     const tool = TOOLS.find((x) => x.id === activeTool)!;

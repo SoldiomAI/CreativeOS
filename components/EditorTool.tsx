@@ -2,8 +2,21 @@ import React, { useState, useCallback } from 'react';
 import { ImageFile } from '../types';
 import { fileToBase64, editImage, generateImage, generateVideo } from '../services/geminiService';
 import { navigateTo } from '../services/config';
+import { saveAsset, urlToBlob } from '../services/library';
 import Spinner from './Spinner';
 import LoadingOverlay from './LoadingOverlay';
+
+const saveToLibrary = async (
+  type: 'image' | 'video',
+  url: string,
+  prompt: string,
+  fallbackMime: string
+) => {
+  try {
+    const blob = await urlToBlob(url);
+    await saveAsset({ type, mime: blob.type || fallbackMime, data: blob, prompt, model: type === 'video' ? 'veo' : 'imagen' });
+  } catch { /* library save is best-effort */ }
+};
 
 enum EditorTab {
   EDIT = 'EDIT',
@@ -151,6 +164,7 @@ const EditorTool: React.FC<EditorToolProps> = ({ onBack }) => {
       const imageUrl = await generateImage(prompt);
       setGeneratedContent(imageUrl);
       await updateSourceImageFromUrl(imageUrl, "generated.jpg", "image/jpeg");
+      saveToLibrary('image', imageUrl, prompt, 'image/jpeg');
     } catch (e: any) {
       setError(e.message || 'An error occurred during image generation.');
     } finally {
@@ -178,6 +192,7 @@ const EditorTool: React.FC<EditorToolProps> = ({ onBack }) => {
       const imageUrl = await editImage(sourceImage, prompt);
       setGeneratedContent(imageUrl);
       await updateSourceImageFromUrl(imageUrl, "edited.png", "image/png");
+      saveToLibrary('image', imageUrl, prompt, 'image/png');
     } catch (e: any) {
       setError(e.message || 'An error occurred while editing the image.');
     } finally {
@@ -204,6 +219,7 @@ const EditorTool: React.FC<EditorToolProps> = ({ onBack }) => {
     try {
       const generatedVideoUrl = await generateVideo(sourceImage, prompt, setLoadingMessage);
       setVideoUrl(generatedVideoUrl);
+      saveToLibrary('video', generatedVideoUrl, prompt, 'video/mp4');
     } catch (e: any) {
       if (e.message === 'API_KEY_REQUIRED') {
         setHasApiKey(false);

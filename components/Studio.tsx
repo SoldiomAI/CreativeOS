@@ -155,6 +155,12 @@ const Studio: React.FC<StudioProps> = ({ onBack }) => {
      try {
         const campaign = await generateSocialMetadata(topic, selectedConcept.hook, selectedConcept.visualDescription);
         setSocialCampaign(campaign);
+        try {
+            const kit = (['youtube', 'instagram', 'tiktok'] as const)
+              .map((p) => `## ${p.toUpperCase()}\n${campaign[p].caption}\n${campaign[p].hashtags.join(' ')}`)
+              .join('\n\n');
+            await saveAsset({ type: 'text', mime: 'text/plain', data: kit, prompt: `Social kit: ${topic}`, model: 'gemini', projectTopic: topic });
+        } catch { /* library save is best-effort */ }
      } catch (e) {
         console.error(e);
         setError("Failed to generate social variants.");
