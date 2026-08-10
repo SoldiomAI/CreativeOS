@@ -4,9 +4,14 @@
 const LS_API_KEY = 'creativeos.apiKey';
 const LS_ASPECT = 'creativeos.aspectRatio';
 const LS_LANG = 'creativeos.lang';
+const LS_PROVIDER = 'creativeos.provider';
+const LS_OPENAI_KEY = 'creativeos.openai.apiKey';
+const LS_OPENAI_BASE = 'creativeos.openai.baseUrl';
+const LS_STARTED = 'creativeos.started';
 
 export type AspectRatio = '9:16' | '16:9' | '1:1';
 export type Language = 'en' | 'ar';
+export type ProviderId = 'gemini' | 'openai';
 
 export const getApiKey = (): string => {
   try {
@@ -27,7 +32,72 @@ export const setApiKey = (key: string): void => {
   window.dispatchEvent(new CustomEvent('creativeos:config-changed'));
 };
 
-export const isDemoMode = (): boolean => !getApiKey();
+export const isDemoMode = (): boolean => !getActiveProviderKey();
+
+export const getProviderId = (): ProviderId => {
+  try {
+    const v = localStorage.getItem(LS_PROVIDER);
+    if (v === 'gemini' || v === 'openai') return v;
+  } catch { /* default below */ }
+  return 'gemini';
+};
+
+export const setProviderId = (id: ProviderId): void => {
+  localStorage.setItem(LS_PROVIDER, id);
+  window.dispatchEvent(new CustomEvent('creativeos:config-changed'));
+};
+
+export const getOpenAiKey = (): string => {
+  try {
+    return (localStorage.getItem(LS_OPENAI_KEY) || '').trim();
+  } catch {
+    return '';
+  }
+};
+
+export const setOpenAiKey = (key: string): void => {
+  if (key && key.trim()) {
+    localStorage.setItem(LS_OPENAI_KEY, key.trim());
+  } else {
+    localStorage.removeItem(LS_OPENAI_KEY);
+  }
+  window.dispatchEvent(new CustomEvent('creativeos:config-changed'));
+};
+
+export const getOpenAiBaseUrl = (): string => {
+  try {
+    const v = (localStorage.getItem(LS_OPENAI_BASE) || '').trim();
+    if (v) return v.replace(/\/+$/, '');
+  } catch { /* default below */ }
+  return 'https://api.openai.com/v1';
+};
+
+export const setOpenAiBaseUrl = (url: string): void => {
+  if (url && url.trim()) {
+    localStorage.setItem(LS_OPENAI_BASE, url.trim());
+  } else {
+    localStorage.removeItem(LS_OPENAI_BASE);
+  }
+  window.dispatchEvent(new CustomEvent('creativeos:config-changed'));
+};
+
+/** Key for whichever provider is currently selected (empty string → demo mode). */
+export const getActiveProviderKey = (): string =>
+  getProviderId() === 'openai' ? getOpenAiKey() : getApiKey();
+
+export const hasStarted = (): boolean => {
+  try {
+    return localStorage.getItem(LS_STARTED) === '1';
+  } catch {
+    return false;
+  }
+};
+
+export const setStarted = (): void => {
+  try {
+    localStorage.setItem(LS_STARTED, '1');
+  } catch { /* non-fatal */ }
+};
 
 export const getAspectRatio = (): AspectRatio => {
   try {
