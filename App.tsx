@@ -1,13 +1,55 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import LandingPage from './components/LandingPage';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
-import Studio from './components/Studio';
+import StudioHub from './components/StudioHub';
+import Library from './components/Library';
+import Settings from './components/Settings';
 import { AppTab } from './types';
+import { I18nProvider, useI18n } from './i18n';
+import { isDemoMode, navigateTo } from './services/config';
 
-export default function App() {
+const DemoBanner: React.FC = () => {
+  const { t } = useI18n();
+  const [demo, setDemo] = useState(isDemoMode());
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    const handler = () => setDemo(isDemoMode());
+    window.addEventListener('creativeos:config-changed', handler);
+    return () => window.removeEventListener('creativeos:config-changed', handler);
+  }, []);
+
+  if (!demo || dismissed) return null;
+
+  return (
+    <div className="relative z-20 mb-4 flex items-center justify-between gap-4 bg-amber-900/30 border border-amber-800/60 text-amber-200 rounded-lg px-4 py-2.5 text-sm">
+      <p>
+        {t('demo.banner')}{' '}
+        <button onClick={() => navigateTo('SETTINGS')} className="underline hover:text-white transition">
+          {t('demo.openSettings')}
+        </button>
+      </p>
+      <button onClick={() => setDismissed(true)} className="text-amber-400 hover:text-white transition" aria-label="Dismiss">✕</button>
+    </div>
+  );
+};
+
+function Shell() {
   const [hasStarted, setHasStarted] = useState(false);
   const [activeTab, setActiveTab] = useState<AppTab>(AppTab.DASHBOARD);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const tab = (e as CustomEvent<string>).detail;
+      if (tab && tab in AppTab) {
+        setHasStarted(true);
+        setActiveTab(AppTab[tab as keyof typeof AppTab]);
+      }
+    };
+    window.addEventListener('creativeos:navigate', handler);
+    return () => window.removeEventListener('creativeos:navigate', handler);
+  }, []);
 
   if (!hasStarted) {
     return (
@@ -23,7 +65,7 @@ export default function App() {
   return (
     <div className="flex h-screen bg-gray-900 text-white overflow-hidden font-sans">
       <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
-      
+
       <main className="flex-grow p-4 md:p-6 overflow-hidden relative">
          {/* Background Elements */}
          <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0 opacity-20">
@@ -31,21 +73,24 @@ export default function App() {
             <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-purple-600/30 rounded-full blur-[120px]"></div>
          </div>
 
-         <div className="relative z-10 h-full">
-            {activeTab === AppTab.DASHBOARD && <Dashboard />}
-            {activeTab === AppTab.STUDIO && <Studio />}
-            {activeTab === AppTab.LIBRARY && (
-                <div className="flex items-center justify-center h-full text-gray-500 font-mono text-sm">
-                    Library Module: Offline
-                </div>
-            )}
-            {activeTab === AppTab.SETTINGS && (
-                <div className="flex items-center justify-center h-full text-gray-500 font-mono text-sm">
-                    Optimization Matrix: Calibrating...
-                </div>
-            )}
+         <div className="relative z-10 h-full flex flex-col">
+            <DemoBanner />
+            <div className="flex-grow min-h-0">
+              {activeTab === AppTab.DASHBOARD && <Dashboard />}
+              {activeTab === AppTab.STUDIO && <StudioHub />}
+              {activeTab === AppTab.LIBRARY && <Library />}
+              {activeTab === AppTab.SETTINGS && <Settings />}
+            </div>
          </div>
       </main>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <I18nProvider>
+      <Shell />
+    </I18nProvider>
   );
 }

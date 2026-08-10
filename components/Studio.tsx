@@ -1,6 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import { ImageFile, CreativeConcept, SocialCampaign } from '../types';
 import { fileToBase64, editImage, generateImage, generateVideo, generateCreativeConcepts, generateSocialMetadata } from '../services/geminiService';
+import { navigateTo } from '../services/config';
+import { saveAsset, urlToBlob } from '../services/library';
 import Spinner from './Spinner';
 import LoadingOverlay from './LoadingOverlay';
 
@@ -120,6 +122,10 @@ const Studio: React.FC<StudioProps> = ({ onBack }) => {
         const url = await generateVideo(sourceImage, visualPrompt, setLoadingMessage);
         setVideoUrl(url);
         setStep(2);
+        try {
+            const blob = await urlToBlob(url);
+            await saveAsset({ type: 'video', mime: blob.type || 'video/mp4', data: blob, prompt: visualPrompt, model: 'veo' });
+        } catch { /* library save is best-effort */ }
     } catch (e: any) {
         if (e.message === 'API_KEY_REQUIRED') {
             setHasApiKey(false);
@@ -135,14 +141,10 @@ const Studio: React.FC<StudioProps> = ({ onBack }) => {
     }
   };
 
-  const handleSelectApiKey = async () => {
-    try {
-        await (window as any).aistudio.openSelectKey();
-        setHasApiKey(true);
-        setError(null);
-    } catch (e) {
-        console.error(e);
-    }
+  const handleSelectApiKey = () => {
+    setHasApiKey(true);
+    setError(null);
+    navigateTo('SETTINGS');
   };
 
   const handleStartDistribution = async () => {

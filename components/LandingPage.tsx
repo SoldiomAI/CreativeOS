@@ -56,7 +56,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
     <div className="w-full max-w-md mx-auto flex flex-col h-[95vh] justify-between text-center p-6 animate-fade-in">
       <div className="flex-grow flex flex-col justify-center">
         <div className="mb-8">
-             <h1 className="text-xs font-mono uppercase tracking-[0.3em] text-gray-400 mb-2">Performance Creative OS</h1>
+             <h1 className="text-xs font-mono uppercase tracking-[0.3em] text-gray-400 mb-2">CreativeOS</h1>
         </div>
         <div className="relative w-full aspect-[9/16] rounded-[32px] overflow-hidden shadow-2xl ring-1 ring-white/20">
           <div className="w-full h-full flex transition-transform duration-700 ease-in-out" style={{ transform: `translateX(-${currentIndex * 100}%)` }}>

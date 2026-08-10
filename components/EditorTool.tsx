@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { ImageFile } from '../types';
 import { fileToBase64, editImage, generateImage, generateVideo } from '../services/geminiService';
+import { navigateTo } from '../services/config';
 import Spinner from './Spinner';
 import LoadingOverlay from './LoadingOverlay';
 
@@ -227,15 +228,10 @@ const EditorTool: React.FC<EditorToolProps> = ({ onBack }) => {
     }
   };
 
-  const handleSelectApiKey = async () => {
-    try {
-        await (window as any).aistudio.openSelectKey();
-        setHasApiKey(true);
-        setError(null);
-        // Let the user retry by clicking the button again
-    } catch (e) {
-        console.error("Failed to open API key selection:", e);
-    }
+  const handleSelectApiKey = () => {
+    setHasApiKey(true);
+    setError(null);
+    navigateTo('SETTINGS');
   }
 
   const renderContent = () => {
