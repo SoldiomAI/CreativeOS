@@ -2,13 +2,64 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CreativeOS — AI Creative Studio</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
+    <meta name="description" content="Free AI creative studio in your browser: write scripts, generate images, voiceovers, and short-form video with Gemini, OpenAI-compatible, or ElevenLabs — or try it instantly in demo mode." />
+    <meta name="theme-color" content="#111827" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="canonical" href="https://soldiom.github.io/CreativeOS/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="CreativeOS" />
+    <meta property="og:title" content="CreativeOS — AI Creative Studio" />
+    <meta property="og:description" content="Write, design, voice, and produce short-form video with AI — in one browser workspace. No signup, keys stay on your device." />
+    <meta property="og:url" content="https://soldiom.github.io/CreativeOS/" />
+    <meta property="og:image" content="https://soldiom.github.io/CreativeOS/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="CreativeOS — AI Creative Studio" />
+    <meta name="twitter:description" content="Write, design, voice, and produce short-form video with AI — in one browser workspace." />
+    <meta name="twitter:image" content="https://soldiom.github.io/CreativeOS/og-image.png" />
+
+    <style>
+      #splash {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        background: #111827;
+        z-index: 9999;
+        transition: opacity 0.3s ease;
+      }
+      #splash img {
+        width: 64px;
+        height: 64px;
+        border-radius: 14px;
+        animation: splash-pulse 1.2s ease-in-out infinite;
+      }
+      #splash span {
+        font: 600 13px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: 0.3em;
+        text-transform: uppercase;
+        color: #9ca3af;
+      }
+      @keyframes splash-pulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(0.92); opacity: 0.7; }
+      }
+    </style>
+  </head>
   <body class="bg-gray-900">
     <div id="root"></div>
+    <div id="splash">
+      <img src="/favicon.svg" alt="" />
+      <span>CreativeOS</span>
+    </div>
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>
