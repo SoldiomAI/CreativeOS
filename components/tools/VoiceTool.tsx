@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { generateSpeech } from '../../services/geminiService';
 import { saveAsset } from '../../services/library';
-import { getProvider, VOICES } from '../../services/providers';
+import { VOICES } from '../../services/providers';
+import { getActiveSpeechEngineId } from '../../services/config';
 import Spinner from '../Spinner';
 import { useI18n } from '../../i18n';
 
@@ -40,9 +41,9 @@ const VoiceTool: React.FC<VoiceToolProps> = ({ initialScript }) => {
     await saveAsset({
       type: 'audio',
       prompt: script.slice(0, 200),
-      model: getProvider().id,
+      model: getActiveSpeechEngineId(),
       data: audioBlob,
-      mime: 'audio/wav',
+      mime: audioBlob.type || 'audio/wav',
     });
     setSaved(true);
   };

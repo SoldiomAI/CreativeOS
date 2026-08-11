@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { generateText } from '../../services/geminiService';
 import { saveAsset } from '../../services/library';
-import { getProvider } from '../../services/providers';
+import { getActiveProviderId } from '../../services/providers';
 import Spinner from '../Spinner';
 import { useI18n } from '../../i18n';
 
@@ -48,7 +48,7 @@ const WriteTool: React.FC<WriteToolProps> = ({ onSendToVoice }) => {
     await saveAsset({
       type: 'text',
       prompt,
-      model: getProvider().id,
+      model: getActiveProviderId(),
       data: result,
       mime: 'text/plain',
     });

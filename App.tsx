@@ -1,13 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import LandingPage from './components/LandingPage';
 import Sidebar from './components/Sidebar';
-import Dashboard from './components/Dashboard';
-import StudioHub from './components/StudioHub';
-import Library from './components/Library';
-import Settings from './components/Settings';
+import Spinner from './components/Spinner';
 import { AppTab } from './types';
 import { I18nProvider, useI18n } from './i18n';
 import { isDemoMode, navigateTo, hasStarted as loadStarted, setStarted } from './services/config';
+
+// Tabs are code-split so the initial bundle stays small; each loads on first visit.
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const StudioHub = lazy(() => import('./components/StudioHub'));
+const Library = lazy(() => import('./components/Library'));
+const Settings = lazy(() => import('./components/Settings'));
+
+const TabFallback: React.FC = () => (
+  <div className="h-full flex items-center justify-center">
+    <Spinner className="w-8 h-8 text-blue-500" />
+  </div>
+);
 
 const DemoBanner: React.FC = () => {
   const { t } = useI18n();
@@ -82,10 +91,12 @@ function Shell() {
          <div className="relative z-10 h-full flex flex-col">
             <DemoBanner />
             <div className="flex-grow min-h-0">
-              {activeTab === AppTab.DASHBOARD && <Dashboard />}
-              {activeTab === AppTab.STUDIO && <StudioHub />}
-              {activeTab === AppTab.LIBRARY && <Library />}
-              {activeTab === AppTab.SETTINGS && <Settings />}
+              <Suspense fallback={<TabFallback />}>
+                {activeTab === AppTab.DASHBOARD && <Dashboard />}
+                {activeTab === AppTab.STUDIO && <StudioHub />}
+                {activeTab === AppTab.LIBRARY && <Library />}
+                {activeTab === AppTab.SETTINGS && <Settings />}
+              </Suspense>
             </div>
          </div>
       </main>
