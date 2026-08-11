@@ -54,6 +54,15 @@ function Shell() {
   };
 
   useEffect(() => {
+    // React is mounted — fade out the pre-React splash from index.html
+    const splash = document.getElementById('splash');
+    if (splash) {
+      splash.style.opacity = '0';
+      window.setTimeout(() => splash.remove(), 300);
+    }
+  }, []);
+
+  useEffect(() => {
     const handler = (e: Event) => {
       const tab = (e as CustomEvent<string>).detail;
       if (tab && tab in AppTab) {
@@ -68,8 +77,11 @@ function Shell() {
 
   if (!hasStarted) {
     return (
-      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop')] bg-cover bg-center">
-        <div className="absolute inset-0 bg-gray-900/90 backdrop-blur-sm"></div>
+      <div className="relative min-h-screen bg-gray-900 text-white flex items-center justify-center overflow-hidden">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30">
+          <div className="absolute top-[-15%] right-[-15%] w-[600px] h-[600px] bg-indigo-600/40 rounded-full blur-[130px]"></div>
+          <div className="absolute bottom-[-15%] left-[-15%] w-[600px] h-[600px] bg-purple-600/40 rounded-full blur-[130px]"></div>
+        </div>
         <div className="relative z-10 w-full h-full">
             <LandingPage onGetStarted={start} />
         </div>

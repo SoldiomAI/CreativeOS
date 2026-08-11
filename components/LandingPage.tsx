@@ -2,20 +2,24 @@ import React, { useState, useEffect, useRef } from 'react';
 
 const slides = [
   {
-    video: 'https://assets.mixkit.co/videos/preview/mixkit-a-woman-in-a-white-dress-and-a-hat-walking-in-a-field-of-41221-large.mp4',
-    title: <>AdWords for <br/> <span className="text-cyan-400">Culture</span></>
+    bg: 'from-purple-600 via-indigo-600 to-blue-700',
+    emoji: '🎬',
+    title: <>AdWords for <br/> <span className="text-cyan-300">Culture</span></>
   },
   {
-    video: 'https://assets.mixkit.co/videos/preview/mixkit-fast-shot-of-a-pizza-being-prepared-in-a-kitchen-4208-large.mp4',
-    title: <>Self-Optimizing <br/> <span className="text-blue-400">Media Factory</span></>
+    bg: 'from-blue-700 via-cyan-600 to-teal-600',
+    emoji: '⚡',
+    title: <>Self-Optimizing <br/> <span className="text-blue-200">Media Factory</span></>
   },
   {
-    video: 'https://assets.mixkit.co/videos/preview/mixkit-a-man-in-a-suit-talking-on-the-phone-32833-large.mp4',
-    title: <>Zero-to-Publish <br/> in <span className="text-white underline decoration-cyan-400">5 Minutes</span></>
+    bg: 'from-indigo-700 via-purple-600 to-pink-600',
+    emoji: '🚀',
+    title: <>Zero-to-Publish <br/> in <span className="text-white underline decoration-cyan-300">5 Minutes</span></>
   },
   {
-    video: 'https://assets.mixkit.co/videos/preview/mixkit-a-person-in-a-gorilla-suit-walking-in-a-forest-41988-large.mp4',
-    title: <>Powered By <br/> Gemini <span className="text-cyan-400">Veo 3.1</span></>
+    bg: 'from-gray-800 via-indigo-800 to-purple-700',
+    emoji: '✨',
+    title: <>Powered By <br/> Gemini <span className="text-cyan-300">Veo 3.1</span></>
   },
 ];
 
@@ -61,15 +65,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
         <div className="relative w-full aspect-[9/16] rounded-[32px] overflow-hidden shadow-2xl ring-1 ring-white/20">
           <div className="w-full h-full flex transition-transform duration-700 ease-in-out" style={{ transform: `translateX(-${currentIndex * 100}%)` }}>
             {slides.map((slide, index) => (
-              <div key={index} className="w-full h-full flex-shrink-0 relative">
-                <video
-                  src={slide.video}
-                  className="w-full h-full object-cover"
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                />
+              <div key={index} className={`w-full h-full flex-shrink-0 relative bg-gradient-to-br ${slide.bg}`}>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-[110px] opacity-40 select-none" aria-hidden="true">{slide.emoji}</span>
+                </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent opacity-90"></div>
                 <div className="absolute bottom-12 left-0 right-0 px-6 text-left">
                     <h2 className="text-white text-4xl font-bold leading-none tracking-tight drop-shadow-lg">
@@ -100,7 +99,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
         >
           Enter System
         </button>
-        <p className="mt-4 text-xs text-gray-500">v2.1.0 • Powered by Google GenAI</p>
+        <p className="mt-4 text-xs text-gray-500">v2.2.0 • Gemini · OpenAI · ElevenLabs</p>
       </div>
     </div>
   );
