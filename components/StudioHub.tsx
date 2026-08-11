@@ -81,7 +81,7 @@ const StudioHub: React.FC = () => {
           {activeTool === 'write' && (
             <WriteTool onSendToVoice={(script) => { setVoiceScript(script); setActiveTool('voice'); }} />
           )}
-          {activeTool === 'design' && <EditorTool />}
+          {activeTool === 'design' && <EditorTool onBack={() => { setActiveTool(null); setVoiceScript(undefined); }} />}
           {activeTool === 'voice' && <VoiceTool initialScript={voiceScript} />}
           {activeTool === 'video' && <Studio />}
         </div>
