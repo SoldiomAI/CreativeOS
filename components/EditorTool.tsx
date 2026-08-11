@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { ImageFile } from '../types';
 import { fileToBase64, editImage, generateImage, generateVideo } from '../services/geminiService';
-import { navigateTo } from '../services/config';
+import { navigateTo, isDemoMode } from '../services/config';
 import { saveAsset, urlToBlob } from '../services/library';
 import Spinner from './Spinner';
 import LoadingOverlay from './LoadingOverlay';
@@ -14,7 +14,8 @@ const saveToLibrary = async (
 ) => {
   try {
     const blob = await urlToBlob(url);
-    await saveAsset({ type, mime: blob.type || fallbackMime, data: blob, prompt, model: type === 'video' ? 'veo' : 'imagen' });
+    const model = isDemoMode() ? 'demo' : type === 'video' ? 'veo' : 'imagen';
+    await saveAsset({ type, mime: blob.type || fallbackMime, data: blob, prompt, model });
   } catch { /* library save is best-effort */ }
 };
 
@@ -97,11 +98,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, sourceImag
   );
 };
 
-interface EditorToolProps {
-  onBack: () => void;
-}
-
-const EditorTool: React.FC<EditorToolProps> = ({ onBack }) => {
+const EditorTool: React.FC = () => {
   const [activeTab, setActiveTab] = useState<EditorTab>(EditorTab.EDIT);
   const [prompt, setPrompt] = useState<string>('');
   const [sourceImage, setSourceImage] = useState<ImageFile | null>(null);
@@ -268,12 +265,6 @@ const EditorTool: React.FC<EditorToolProps> = ({ onBack }) => {
   return (
     <div className="w-full max-w-4xl mx-auto flex flex-col h-full justify-center text-center p-4 md:p-8 animate-fade-in-fast">
       <div className="relative w-full bg-gray-800/50 backdrop-blur-md rounded-2xl shadow-2xl ring-1 ring-white/10 p-6 md:p-8 flex flex-col md:flex-row gap-6 md:gap-8">
-        <button onClick={onBack} className="absolute top-4 left-4 text-gray-400 hover:text-white transition-colors z-10" aria-label="Go back">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-        </button>
-        
         <div className="md:w-1/2 flex flex-col space-y-4">
           <div className="flex w-full bg-gray-900/50 p-1 rounded-lg">
             <button onClick={() => handleTabChange(EditorTab.EDIT)} className={`w-1/2 py-2 text-sm font-semibold rounded-md transition-colors ${activeTab === EditorTab.EDIT ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Edit</button>

@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { ImageFile, CreativeConcept, SocialCampaign } from '../types';
 import { fileToBase64, editImage, generateImage, generateVideo, generateCreativeConcepts, generateSocialMetadata } from '../services/geminiService';
-import { navigateTo } from '../services/config';
+import { navigateTo, isDemoMode } from '../services/config';
 import { saveAsset, urlToBlob, listAssets, AssetRecord } from '../services/library';
 import { useI18n } from '../i18n';
 import Spinner from './Spinner';
@@ -157,7 +157,7 @@ const Studio: React.FC<StudioProps> = ({ onBack }) => {
         setStep(2);
         try {
             const blob = await urlToBlob(url);
-            await saveAsset({ type: 'video', mime: blob.type || 'video/mp4', data: blob, prompt: visualPrompt, model: 'veo' });
+            await saveAsset({ type: 'video', mime: blob.type || 'video/mp4', data: blob, prompt: visualPrompt, model: isDemoMode() ? 'demo' : 'veo' });
         } catch { /* library save is best-effort */ }
     } catch (e: any) {
         if (e.message === 'API_KEY_REQUIRED') {
@@ -192,7 +192,7 @@ const Studio: React.FC<StudioProps> = ({ onBack }) => {
             const kit = (['youtube', 'instagram', 'tiktok'] as const)
               .map((p) => `## ${p.toUpperCase()}\n${campaign[p].caption}\n${campaign[p].hashtags.join(' ')}`)
               .join('\n\n');
-            await saveAsset({ type: 'text', mime: 'text/plain', data: kit, prompt: `Social kit: ${topic}`, model: 'gemini', projectTopic: topic });
+            await saveAsset({ type: 'text', mime: 'text/plain', data: kit, prompt: `Social kit: ${topic}`, model: isDemoMode() ? 'demo' : 'gemini', projectTopic: topic });
         } catch { /* library save is best-effort */ }
      } catch (e) {
         console.error(e);
@@ -261,8 +261,8 @@ const Studio: React.FC<StudioProps> = ({ onBack }) => {
       {concepts.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {concepts.map((concept, idx) => (
-                <div key={idx} className="bg-gray-900 border border-gray-700 hover:border-cyan-500 p-5 rounded-xl cursor-pointer transition-all group relative overflow-hidden" onClick={() => handleSelectConcept(concept)}>
-                    <div className="absolute top-0 right-0 bg-gray-800 px-2 py-1 text-xs font-mono text-cyan-400 rounded-bl-lg border-b border-l border-gray-700">Score: {concept.viralScore}</div>
+                <button type="button" key={idx} className="bg-gray-900 border border-gray-700 hover:border-cyan-500 p-5 rounded-xl cursor-pointer transition-all group relative overflow-hidden text-left rtl:text-right" onClick={() => handleSelectConcept(concept)}>
+                    <div className="absolute top-0 right-0 rtl:right-auto rtl:left-0 bg-gray-800 px-2 py-1 text-xs font-mono text-cyan-400 rounded-bl-lg rtl:rounded-bl-none rtl:rounded-br-lg border-b border-l rtl:border-l-0 rtl:border-r border-gray-700">Score: {concept.viralScore}</div>
                     <h3 className="font-bold text-lg text-white mb-2 group-hover:text-cyan-400">{concept.title}</h3>
                     <div className="mb-3">
                         <span className="text-xs text-gray-500 uppercase tracking-wider font-bold">Hook</span>
@@ -272,7 +272,7 @@ const Studio: React.FC<StudioProps> = ({ onBack }) => {
                         <span className="text-xs text-gray-500 uppercase tracking-wider font-bold">Visual</span>
                         <p className="text-gray-400 text-xs line-clamp-3">{concept.visualDescription}</p>
                     </div>
-                </div>
+                </button>
             ))}
         </div>
       )}

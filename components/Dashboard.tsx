@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AssetRecord, AssetType, listAssets } from '../services/library';
+import { AssetRecord, AssetType, listAssets, stripMarkdown } from '../services/library';
 import { isDemoMode, getProviderId, navigateTo } from '../services/config';
 import { useI18n, TranslationKey } from '../i18n';
 
@@ -31,6 +31,9 @@ const ACTIONS: QuickAction[] = [
 ];
 
 const openTool = (tool: QuickAction['tool']) => {
+  // Persist the choice: StudioHub is lazy-loaded, so its event listener may not
+  // be attached yet on first navigation. It reads this key on mount.
+  try { sessionStorage.setItem('creativeos.pendingTool', tool); } catch { /* non-blocking */ }
   navigateTo('STUDIO');
   window.dispatchEvent(new CustomEvent('creativeos:studio-tool', { detail: tool }));
 };
@@ -40,6 +43,7 @@ const Thumb: React.FC<{ asset: AssetRecord; url: string | null }> = ({ asset, ur
     onClick={() => navigateTo('LIBRARY')}
     className="w-28 h-28 shrink-0 rounded-xl overflow-hidden bg-gray-900 border border-gray-700 hover:border-gray-500 transition relative group"
     title={asset.prompt}
+    aria-label={asset.prompt || asset.type}
   >
     {asset.type === 'image' && url && <img src={url} alt={asset.prompt} className="w-full h-full object-cover" />}
     {asset.type === 'video' && url && <video src={url} muted className="w-full h-full object-cover" />}
@@ -50,7 +54,7 @@ const Thumb: React.FC<{ asset: AssetRecord; url: string | null }> = ({ asset, ur
     )}
     {asset.type === 'text' && (
       <p className="p-2 text-[10px] text-gray-400 line-clamp-5 text-left rtl:text-right whitespace-pre-wrap">
-        {typeof asset.data === 'string' ? asset.data : ''}
+        {typeof asset.data === 'string' ? stripMarkdown(asset.data) : ''}
       </p>
     )}
     <span className="absolute bottom-1 left-1 rtl:left-auto rtl:right-1 text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-gray-950/80 text-gray-300">
@@ -153,7 +157,7 @@ const Dashboard: React.FC = () => {
           <h3 className="text-white font-bold">{t('dash.recent')}</h3>
           {assets.length > 0 && (
             <button onClick={() => navigateTo('LIBRARY')} className="text-blue-400 hover:text-blue-300 text-sm transition">
-              {t('dash.viewAll')} →
+              {t('dash.viewAll')} <span className="inline-block rtl:rotate-180">→</span>
             </button>
           )}
         </div>

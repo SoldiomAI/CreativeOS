@@ -46,15 +46,31 @@ const TOOLS: ToolDef[] = [
   },
 ];
 
+const isToolId = (value: string | null): value is ToolId =>
+  value === 'write' || value === 'design' || value === 'voice' || value === 'video';
+
+const clearPendingTool = () => {
+  try { sessionStorage.removeItem('creativeos.pendingTool'); } catch { /* non-blocking */ }
+};
+
 const StudioHub: React.FC = () => {
   const { t } = useI18n();
-  const [activeTool, setActiveTool] = useState<ToolId | null>(null);
+  // Quick Create sets a pending tool before this lazy component mounts;
+  // pick it up as the initial state so the deep-link isn't missed.
+  const [activeTool, setActiveTool] = useState<ToolId | null>(() => {
+    try {
+      const pending = sessionStorage.getItem('creativeos.pendingTool');
+      return isToolId(pending) ? pending : null;
+    } catch { return null; }
+  });
   const [voiceScript, setVoiceScript] = useState<string | undefined>(undefined);
 
   useEffect(() => {
+    clearPendingTool();
     const handler = (e: Event) => {
       const tool = (e as CustomEvent<string>).detail;
-      if (tool === 'write' || tool === 'design' || tool === 'voice' || tool === 'video') {
+      if (isToolId(tool)) {
+        clearPendingTool();
         setActiveTool(tool);
       }
     };
@@ -81,7 +97,7 @@ const StudioHub: React.FC = () => {
           {activeTool === 'write' && (
             <WriteTool onSendToVoice={(script) => { setVoiceScript(script); setActiveTool('voice'); }} />
           )}
-          {activeTool === 'design' && <EditorTool onBack={() => { setActiveTool(null); setVoiceScript(undefined); }} />}
+          {activeTool === 'design' && <EditorTool />}
           {activeTool === 'voice' && <VoiceTool initialScript={voiceScript} />}
           {activeTool === 'video' && <Studio />}
         </div>

@@ -25,6 +25,15 @@ interface CreativeOsDB extends DBSchema {
 
 let dbPromise: Promise<IDBPDatabase<CreativeOsDB>> | null = null;
 
+/** Strips common markdown syntax so text previews read as plain text. */
+export const stripMarkdown = (text: string): string =>
+  text
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^[-*]\s+/gm, '• ');
+
 const getDb = (): Promise<IDBPDatabase<CreativeOsDB>> => {
   if (!dbPromise) {
     dbPromise = openDB<CreativeOsDB>('creativeos', 1, {

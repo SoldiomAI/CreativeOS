@@ -39,6 +39,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
             <button
               key={item.id}
               onClick={() => onTabChange(item.id)}
+              aria-label={item.label}
+              title={item.label}
+              aria-current={activeTab === item.id ? 'page' : undefined}
               className={`w-full flex items-center justify-center md:justify-start p-3 rounded-lg transition-all duration-200 group ${
                 activeTab === item.id 
                 ? 'bg-blue-600/10 text-blue-400 border border-blue-900/50' 

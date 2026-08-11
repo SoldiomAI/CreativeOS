@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AssetRecord, AssetType, listAssets, deleteAsset } from '../services/library';
+import { AssetRecord, AssetType, listAssets, deleteAsset, stripMarkdown } from '../services/library';
 import { useI18n, TranslationKey } from '../i18n';
 
 type Filter = 'all' | AssetType;
@@ -38,7 +38,7 @@ interface CardProps {
 
 const AssetCard: React.FC<CardProps> = ({ asset, url, onOpen, onDelete, t }) => (
   <div className="bg-gray-800/50 border border-gray-700 rounded-xl overflow-hidden flex flex-col group hover:border-gray-500 transition">
-    <button onClick={onOpen} className="aspect-square bg-gray-900 flex items-center justify-center overflow-hidden relative">
+    <button onClick={onOpen} aria-label={asset.prompt || asset.type} className="aspect-square bg-gray-900 flex items-center justify-center overflow-hidden relative">
       {asset.type === 'image' && url && <img src={url} alt={asset.prompt} className="w-full h-full object-cover" />}
       {asset.type === 'video' && url && <video src={url} muted className="w-full h-full object-cover" />}
       {asset.type === 'audio' && (
@@ -46,7 +46,7 @@ const AssetCard: React.FC<CardProps> = ({ asset, url, onOpen, onDelete, t }) => 
       )}
       {asset.type === 'text' && (
         <p className="p-4 text-xs text-gray-400 line-clamp-6 text-left rtl:text-right whitespace-pre-wrap">
-          {typeof asset.data === 'string' ? asset.data : ''}
+          {typeof asset.data === 'string' ? stripMarkdown(asset.data) : ''}
         </p>
       )}
     </button>
