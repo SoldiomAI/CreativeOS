@@ -4,6 +4,8 @@ import {
   getAspectRatio, setAspectRatio, AspectRatio,
   getProviderId, setProviderId, ProviderId,
   getOpenAiKey, setOpenAiKey, getOpenAiBaseUrl, setOpenAiBaseUrl,
+  getVoiceEngine, setVoiceEngine, VoiceEngine,
+  getElevenLabsKey, setElevenLabsKey,
 } from '../services/config';
 import { useI18n } from '../i18n';
 
@@ -26,6 +28,9 @@ const Settings: React.FC = () => {
   const [openAiKeyInput, setOpenAiKeyInput] = useState('');
   const [hasOpenAiKey, setHasOpenAiKey] = useState(!!getOpenAiKey());
   const [baseUrlInput, setBaseUrlInput] = useState(getOpenAiBaseUrl());
+  const [voiceEngine, setVoiceEngineState] = useState<VoiceEngine>(getVoiceEngine());
+  const [elevenKeyInput, setElevenKeyInput] = useState('');
+  const [hasElevenKey, setHasElevenKey] = useState(!!getElevenLabsKey());
   const [aspect, setAspect] = useState<AspectRatio>(getAspectRatio());
   const [savedFlash, setSavedFlash] = useState(false);
 
@@ -78,6 +83,25 @@ const Settings: React.FC = () => {
   const handleClearOpenAi = () => {
     setOpenAiKey('');
     refreshKeyState();
+    flash();
+  };
+
+  const handleVoiceEngine = (engine: VoiceEngine) => {
+    setVoiceEngineState(engine);
+    setVoiceEngine(engine);
+    flash();
+  };
+
+  const handleSaveEleven = () => {
+    setElevenLabsKey(elevenKeyInput);
+    setElevenKeyInput('');
+    setHasElevenKey(!!getElevenLabsKey());
+    flash();
+  };
+
+  const handleClearEleven = () => {
+    setElevenLabsKey('');
+    setHasElevenKey(false);
     flash();
   };
 
@@ -197,6 +221,52 @@ const Settings: React.FC = () => {
               <p className="text-xs text-gray-500 mt-3">{t('settings.openai.hint')}</p>
             </section>
           )}
+
+          {/* Voice engine */}
+          <section className={sectionCls}>
+            <h3 className="text-white font-bold mb-3">{t('settings.voice')}</h3>
+            <div className="grid grid-cols-2 gap-3 max-w-sm">
+              <button onClick={() => handleVoiceEngine('provider')} className={pillCls(voiceEngine === 'provider')}>
+                {t('settings.voice.provider')}
+              </button>
+              <button onClick={() => handleVoiceEngine('elevenlabs')} className={pillCls(voiceEngine === 'elevenlabs')}>
+                ElevenLabs
+              </button>
+            </div>
+            {voiceEngine === 'elevenlabs' && (
+              <div className="mt-4">
+                <p className={`text-xs font-mono mb-2 ${statusColor(hasElevenKey)}`}>
+                  {hasElevenKey ? t('settings.apiKey.set') : t('settings.apiKey.none')}
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    value={elevenKeyInput}
+                    onChange={(e) => setElevenKeyInput(e.target.value)}
+                    placeholder="xi-..."
+                    autoComplete="off"
+                    className={inputCls}
+                  />
+                  <button
+                    onClick={handleSaveEleven}
+                    disabled={!elevenKeyInput.trim()}
+                    className="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 text-white text-sm font-bold px-4 py-2.5 rounded-lg transition"
+                  >
+                    {t('settings.apiKey.save')}
+                  </button>
+                  {hasElevenKey && (
+                    <button
+                      onClick={handleClearEleven}
+                      className="border border-gray-600 text-gray-300 hover:text-white text-sm px-4 py-2.5 rounded-lg transition"
+                    >
+                      {t('settings.apiKey.clear')}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+            <p className="text-xs text-gray-500 mt-3">{t('settings.voice.hint')}</p>
+          </section>
 
           {/* Aspect ratio */}
           <section className={sectionCls}>

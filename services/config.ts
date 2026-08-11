@@ -7,11 +7,14 @@ const LS_LANG = 'creativeos.lang';
 const LS_PROVIDER = 'creativeos.provider';
 const LS_OPENAI_KEY = 'creativeos.openai.apiKey';
 const LS_OPENAI_BASE = 'creativeos.openai.baseUrl';
+const LS_VOICE_ENGINE = 'creativeos.voiceEngine';
+const LS_ELEVEN_KEY = 'creativeos.elevenlabs.apiKey';
 const LS_STARTED = 'creativeos.started';
 
 export type AspectRatio = '9:16' | '16:9' | '1:1';
 export type Language = 'en' | 'ar';
 export type ProviderId = 'gemini' | 'openai';
+export type VoiceEngine = 'provider' | 'elevenlabs';
 
 export const getApiKey = (): string => {
   try {
@@ -84,6 +87,41 @@ export const setOpenAiBaseUrl = (url: string): void => {
 /** Key for whichever provider is currently selected (empty string → demo mode). */
 export const getActiveProviderKey = (): string =>
   getProviderId() === 'openai' ? getOpenAiKey() : getApiKey();
+
+export const getVoiceEngine = (): VoiceEngine => {
+  try {
+    if (localStorage.getItem(LS_VOICE_ENGINE) === 'elevenlabs') return 'elevenlabs';
+  } catch { /* default below */ }
+  return 'provider';
+};
+
+export const setVoiceEngine = (engine: VoiceEngine): void => {
+  localStorage.setItem(LS_VOICE_ENGINE, engine);
+  window.dispatchEvent(new CustomEvent('creativeos:config-changed'));
+};
+
+export const getElevenLabsKey = (): string => {
+  try {
+    return (localStorage.getItem(LS_ELEVEN_KEY) || '').trim();
+  } catch {
+    return '';
+  }
+};
+
+export const setElevenLabsKey = (key: string): void => {
+  if (key && key.trim()) {
+    localStorage.setItem(LS_ELEVEN_KEY, key.trim());
+  } else {
+    localStorage.removeItem(LS_ELEVEN_KEY);
+  }
+  window.dispatchEvent(new CustomEvent('creativeos:config-changed'));
+};
+
+/** Engine that will actually synthesize speech (for labels/asset metadata). */
+export const getActiveSpeechEngineId = (): string => {
+  if (getVoiceEngine() === 'elevenlabs' && getElevenLabsKey()) return 'elevenlabs';
+  return isDemoMode() ? 'demo' : getProviderId();
+};
 
 export const hasStarted = (): boolean => {
   try {
