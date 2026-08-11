@@ -1,15 +1,19 @@
 # CreativeOS
 
-**AI creative studio** — generate text, images, voiceovers, and short-form video in one workspace. Built with React 19, Vite, and the Google Gemini API.
+**AI creative studio** — generate text, images, voiceovers, and short-form video in one workspace. Built with React 19, Vite, and pluggable AI providers (Google Gemini, OpenAI-compatible, ElevenLabs).
+
+**Live:** https://soldiom.github.io/CreativeOS/ (installable PWA, starts in demo mode — bring your own API keys in Settings)
 
 ## Features
 
-- **✍️ Write** — scripts, hooks, captions, and ad copy (Gemini 2.5 Flash) with tone & platform presets
-- **🎨 Design** — text-to-image (Imagen 4) and AI image editing (Gemini 2.5 Flash Image)
-- **🎙️ Voice** — text-to-speech with 6 studio voices (Gemini 2.5 Flash TTS), WAV export
-- **🎬 Video** — full pipeline: concept ideation → keyframe → Veo 3.1 video → social distribution kit
+- **✍️ Write** — scripts, hooks, captions, and ad copy with tone & platform presets
+- **🎨 Design** — text-to-image and AI image editing
+- **🎙️ Voice** — text-to-speech with 6 studio voices; optional dedicated **ElevenLabs** engine
+- **🎬 Video** — full pipeline: concept ideation → keyframe → Veo 3.1 video → social distribution kit, with recent-video history
 - **📦 Asset Library** — every generation saved locally (IndexedDB): preview, download, delete
+- **🔌 Providers** — Google Gemini or any OpenAI-compatible endpoint (OpenRouter, LiteLLM, local), switchable in Settings
 - **🌐 Bilingual** — English / العربية with full RTL layout
+- **📱 PWA** — installable, offline-capable shell with auto-update
 - **🧪 Demo mode** — no API key? The whole UI works with locally generated placeholder assets
 
 ## Quick start
@@ -25,13 +29,17 @@ That's it — the app starts in **demo mode** with placeholder generations.
 
 ### Enable real AI generation
 
-Get a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey), then either:
+Open **Settings** in the app and pick a provider:
 
-1. **Environment file** — copy `.env.example` to `.env.local` and set:
-   ```
-   GEMINI_API_KEY=your_key_here
-   ```
-2. **In-app** — open **Settings** and paste the key (stored in your browser's localStorage; it never leaves your machine except in direct calls to the Gemini API).
+- **Google Gemini** — key from [Google AI Studio](https://aistudio.google.com/apikey) (or set `GEMINI_API_KEY` in `.env.local` for dev)
+- **OpenAI-compatible** — key + optional base URL (api.openai.com, OpenRouter, LiteLLM, local server)
+- **Voice engine** — optionally route voiceovers through [ElevenLabs](https://elevenlabs.io) with its own key
+
+Keys are stored in your browser's localStorage; they never leave your machine except in direct calls to the chosen API.
+
+## Deployment
+
+Pushes to `main` auto-deploy to **GitHub Pages** via `.github/workflows/deploy.yml` (build with `BASE_PATH=/CreativeOS/`, upload `dist/`, deploy). The site is a static SPA — no server, no stored secrets.
 
 ## Scripts
 
@@ -58,14 +66,16 @@ Get a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey)
 └── services/
     ├── config.ts              # Key/aspect/language storage + app events
     ├── library.ts             # IndexedDB asset store (idb)
-    ├── geminiService.ts       # Facade over the active provider
+    ├── geminiService.ts       # Facade over the active provider (lazy-loaded)
     └── providers/
         ├── types.ts           # GenerationProvider interface
         ├── gemini.ts          # Google Gemini implementation
+        ├── openai.ts          # OpenAI-compatible implementation
+        ├── elevenlabs.ts      # Dedicated ElevenLabs speech engine
         └── demo.ts            # Offline placeholder implementation
 ```
 
-**Provider layer:** all generation goes through a single `GenerationProvider` interface. With no API key, the `DemoProvider` produces placeholder assets entirely in the browser (canvas images, WAV chimes, WebM clips) — so the app is always usable. Additional providers (OpenAI, Replicate, ElevenLabs, …) can be added by implementing the same interface.
+**Provider layer:** all generation goes through a single `GenerationProvider` interface, resolved lazily per call — heavy SDKs stay out of the initial bundle (code-split with `React.lazy` tabs + dynamic provider imports). With no API key, the `DemoProvider` produces placeholder assets entirely in the browser (canvas images, WAV chimes, WebM clips) — so the app is always usable.
 
 **Models used:** `gemini-2.5-flash` (text/JSON) · `imagen-4.0-generate-001` (images) · `gemini-2.5-flash-image` (editing) · `gemini-2.5-flash-preview-tts` (speech) · `veo-3.1-fast-generate-preview` (video)
 
