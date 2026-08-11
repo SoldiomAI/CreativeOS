@@ -1,8 +1,9 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { ImageFile, CreativeConcept, SocialCampaign } from '../types';
 import { fileToBase64, editImage, generateImage, generateVideo, generateCreativeConcepts, generateSocialMetadata } from '../services/geminiService';
 import { navigateTo } from '../services/config';
-import { saveAsset, urlToBlob } from '../services/library';
+import { saveAsset, urlToBlob, listAssets, AssetRecord } from '../services/library';
+import { useI18n } from '../i18n';
 import Spinner from './Spinner';
 import LoadingOverlay from './LoadingOverlay';
 
@@ -16,6 +17,7 @@ interface PlatformStatus {
 }
 
 const Studio: React.FC<StudioProps> = ({ onBack }) => {
+  const { t } = useI18n();
   // Steps: 0: Hook Foundry, 1: Production, 2: Result, 3: Distribution
   const [step, setStep] = useState(0);
   
@@ -45,6 +47,37 @@ const Studio: React.FC<StudioProps> = ({ onBack }) => {
   });
   const [isPublishing, setIsPublishing] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
+
+  // Recent video history (from the asset library)
+  const [recentVideos, setRecentVideos] = useState<{ record: AssetRecord; url: string }[]>([]);
+
+  useEffect(() => {
+    let urls: string[] = [];
+    let cancelled = false;
+    const loadRecent = async () => {
+      try {
+        const videos = (await listAssets('video')).slice(0, 6);
+        const mapped = videos.map((record) => ({
+          record,
+          url: record.data instanceof Blob ? URL.createObjectURL(record.data) : String(record.data),
+        }));
+        if (cancelled) {
+          mapped.forEach((v) => v.record.data instanceof Blob && URL.revokeObjectURL(v.url));
+          return;
+        }
+        urls.forEach((u) => URL.revokeObjectURL(u));
+        urls = mapped.filter((v) => v.record.data instanceof Blob).map((v) => v.url);
+        setRecentVideos(mapped);
+      } catch { /* history is best-effort */ }
+    };
+    loadRecent();
+    window.addEventListener('creativeos:library-changed', loadRecent);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('creativeos:library-changed', loadRecent);
+      urls.forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, []);
 
   // General Loading/Error
   const [isLoading, setIsLoading] = useState(false);
@@ -241,6 +274,33 @@ const Studio: React.FC<StudioProps> = ({ onBack }) => {
                     </div>
                 </div>
             ))}
+        </div>
+      )}
+
+      {recentVideos.length > 0 && (
+        <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-white font-bold">{t('studio.recentVideos')}</h3>
+            <button onClick={() => navigateTo('LIBRARY')} className="text-xs text-blue-400 hover:text-white transition">
+              {t('dash.viewAll')}
+            </button>
+          </div>
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+            {recentVideos.map(({ record, url }) => (
+              <video
+                key={record.id}
+                src={url}
+                muted
+                loop
+                playsInline
+                title={record.prompt}
+                onMouseEnter={(e) => e.currentTarget.play().catch(() => {})}
+                onMouseLeave={(e) => e.currentTarget.pause()}
+                className="aspect-[9/16] w-full object-cover rounded-lg border border-gray-700 hover:border-cyan-500 transition cursor-pointer"
+                onClick={() => navigateTo('LIBRARY')}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>
