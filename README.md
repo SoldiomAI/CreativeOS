@@ -1,8 +1,8 @@
 # CreativeOS
 
-**AI creative studio** — generate text, images, voiceovers, and short-form video in one workspace. Built with React 19, Vite, and pluggable AI providers (Google Gemini, OpenAI-compatible, ElevenLabs).
+**AI creative studio** — generate text, images, voiceovers, and short-form video in one workspace. Built with React 19, Vite, and pluggable AI providers (Google Gemini, OpenAI-compatible, Pollinations free tier, ElevenLabs).
 
-**Live:** https://soldiom.github.io/CreativeOS/ (installable PWA, starts in demo mode — bring your own API keys in Settings)
+**Live:** https://soldiomai.github.io/CreativeOS/ (installable PWA — works instantly with the free provider or demo mode, bring your own API keys for Gemini/OpenAI)
 
 ## Features
 
@@ -10,8 +10,8 @@
 - **🎨 Design** — text-to-image and AI image editing
 - **🎙️ Voice** — text-to-speech with 6 studio voices; optional dedicated **ElevenLabs** engine
 - **🎬 Video** — full pipeline: concept ideation → keyframe → Veo 3.1 video → social distribution kit, with recent-video history
-- **📦 Asset Library** — every generation saved locally (IndexedDB): preview, download, delete
-- **🔌 Providers** — Google Gemini or any OpenAI-compatible endpoint (OpenRouter, LiteLLM, local), switchable in Settings
+- **📦 Asset Library** — every generation saved locally (IndexedDB): search, tags, preview, share, download, delete
+- **🔌 Providers** — Google Gemini, any OpenAI-compatible endpoint (OpenRouter, LiteLLM, local), or **Pollinations — free, no API key**, switchable in Settings
 - **🌐 Bilingual** — English / العربية with full RTL layout
 - **📱 PWA** — installable, offline-capable shell with auto-update
 - **🧪 Demo mode** — no API key? The whole UI works with locally generated placeholder assets
@@ -31,6 +31,7 @@ That's it — the app starts in **demo mode** with placeholder generations.
 
 Open **Settings** in the app and pick a provider:
 
+- **Pollinations (Free)** — real text and image generation with **no API key and no signup** (rate-limited free tier; voice, image editing & video need a keyed provider)
 - **Google Gemini** — key from [Google AI Studio](https://aistudio.google.com/apikey) (or set `GEMINI_API_KEY` in `.env.local` for dev)
 - **OpenAI-compatible** — key + optional base URL (api.openai.com, OpenRouter, LiteLLM, local server)
 - **Voice engine** — optionally route voiceovers through [ElevenLabs](https://elevenlabs.io) with its own key
@@ -49,6 +50,7 @@ Pushes to `main` auto-deploy to **GitHub Pages** via `.github/workflows/deploy.y
 | `npm run build` | Production build to `dist/` |
 | `npm run preview` | Preview the production build |
 | `npm run typecheck` | TypeScript type checking |
+| `npm run e2e` | Playwright smoke test (builds + tests the production bundle) |
 
 ## Architecture
 
@@ -71,6 +73,7 @@ Pushes to `main` auto-deploy to **GitHub Pages** via `.github/workflows/deploy.y
         ├── types.ts           # GenerationProvider interface
         ├── gemini.ts          # Google Gemini implementation
         ├── openai.ts          # OpenAI-compatible implementation
+        ├── pollinations.ts    # Free keyless provider (pollinations.ai)
         ├── elevenlabs.ts      # Dedicated ElevenLabs speech engine
         └── demo.ts            # Offline placeholder implementation
 ```

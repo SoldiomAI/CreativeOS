@@ -34,7 +34,7 @@ const ogSvg = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1200" 
   </g>
   <text x="100" y="360" font-family="Segoe UI, Arial, sans-serif" font-size="86" font-weight="800" fill="#ffffff">CreativeOS</text>
   <text x="100" y="430" font-family="Segoe UI, Arial, sans-serif" font-size="38" fill="#c7d2fe">AI creative studio — write, design, voice &amp; video</text>
-  <text x="100" y="520" font-family="Segoe UI, Arial, sans-serif" font-size="28" fill="#818cf8">soldiom.github.io/CreativeOS</text>
+  <text x="100" y="520" font-family="Segoe UI, Arial, sans-serif" font-size="28" fill="#818cf8">soldiomai.github.io/CreativeOS</text>
 </svg>`);
 
 await sharp(svg, { density: 300 }).resize(192, 192).png().toFile('public/pwa-192.png');

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AssetRecord, AssetType, listAssets, deleteAsset, stripMarkdown } from '../services/library';
+import { AssetRecord, AssetType, listAssets, deleteAsset, updateAsset, matchesQuery, stripMarkdown } from '../services/library';
 import { useI18n, TranslationKey } from '../i18n';
 
 type Filter = 'all' | AssetType;
@@ -56,6 +56,13 @@ const AssetCard: React.FC<CardProps> = ({ asset, url, onOpen, onDelete, t }) => 
         <span className="text-[10px] text-gray-500 font-mono">{new Date(asset.createdAt).toLocaleDateString()}</span>
       </div>
       <p className="text-xs text-gray-400 line-clamp-2" title={asset.prompt}>{asset.prompt || '—'}</p>
+      {asset.tags && asset.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {asset.tags.slice(0, 3).map((tag) => (
+            <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-gray-700/60 text-gray-300">#{tag}</span>
+          ))}
+        </div>
+      )}
       <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition">
         <button
           onClick={onDelete}
@@ -73,7 +80,10 @@ const Library: React.FC = () => {
   const [assets, setAssets] = useState<AssetRecord[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState<Filter>('all');
+  const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<AssetRecord | null>(null);
+  const [tagInput, setTagInput] = useState('');
+  const [shareFlash, setShareFlash] = useState(false);
 
   const refresh = async () => {
     const list = await listAssets(filter === 'all' ? undefined : filter);
@@ -113,6 +123,60 @@ const Library: React.FC = () => {
     a.click();
   };
 
+  const flashShared = () => {
+    setShareFlash(true);
+    setTimeout(() => setShareFlash(false), 1800);
+  };
+
+  const handleShare = async (asset: AssetRecord) => {
+    const title = 'CreativeOS';
+    try {
+      if (typeof asset.data === 'string') {
+        if (navigator.share) {
+          await navigator.share({ title, text: asset.data });
+        } else {
+          await navigator.clipboard.writeText(asset.data);
+          flashShared();
+        }
+        return;
+      }
+      const file = new File([asset.data], `creativeos-${asset.type}-${asset.id.slice(0, 8)}.${extFor(asset)}`, { type: asset.mime });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ title, files: [file] });
+      } else {
+        handleDownload(asset);
+      }
+    } catch (err) {
+      // User cancelled the share sheet — not an error.
+      if ((err as Error)?.name === 'AbortError') return;
+      if (typeof asset.data === 'string') {
+        try {
+          await navigator.clipboard.writeText(asset.data);
+          flashShared();
+        } catch { handleDownload(asset); }
+      } else {
+        handleDownload(asset);
+      }
+    }
+  };
+
+  const handleAddTag = async (asset: AssetRecord) => {
+    const tag = tagInput.trim().replace(/^#/, '').toLowerCase();
+    if (!tag) return;
+    const tags = Array.from(new Set([...(asset.tags ?? []), tag]));
+    const next = await updateAsset(asset.id, { tags });
+    if (next) setSelected(next);
+    setTagInput('');
+  };
+
+  const handleRemoveTag = async (asset: AssetRecord, tag: string) => {
+    const tags = (asset.tags ?? []).filter((x) => x !== tag);
+    const next = await updateAsset(asset.id, { tags });
+    if (next) setSelected(next);
+  };
+
+  const visible = assets.filter((a) => matchesQuery(a, query));
+
   return (
     <div className="h-full flex flex-col animate-fade-in overflow-hidden">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -120,7 +184,15 @@ const Library: React.FC = () => {
           <h2 className="text-2xl font-bold text-white tracking-tight">{t('library.title')}</h2>
           <p className="text-gray-400 text-sm">{t('library.subtitle')}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t('library.search')}
+            aria-label={t('library.search')}
+            className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 outline-none w-44"
+          />
           {FILTERS.map((f) => (
             <button
               key={f.id}
@@ -137,18 +209,18 @@ const Library: React.FC = () => {
         </div>
       </div>
 
-      {assets.length === 0 ? (
+      {visible.length === 0 ? (
         <div className="flex-grow flex items-center justify-center text-gray-500 text-sm">
-          {t('library.empty')}
+          {query.trim() ? t('library.noResults') : t('library.empty')}
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 overflow-y-auto pb-6">
-          {assets.map((asset) => (
+          {visible.map((asset) => (
             <AssetCard
               key={asset.id}
               asset={asset}
               url={urls[asset.id] ?? null}
-              onOpen={() => setSelected(asset)}
+              onOpen={() => { setSelected(asset); setTagInput(''); }}
               onDelete={() => handleDelete(asset.id)}
               t={t}
             />
@@ -171,11 +243,36 @@ const Library: React.FC = () => {
                 <pre className="whitespace-pre-wrap text-sm text-gray-300 font-sans w-full">{typeof selected.data === 'string' ? selected.data : ''}</pre>
               )}
             </div>
-            <div className="p-4 border-t border-gray-800 flex items-center justify-between gap-3">
-              <p className="text-xs text-gray-500 line-clamp-1" title={selected.prompt}>{selected.prompt}</p>
-              <div className="flex gap-2 shrink-0">
-                <button onClick={() => handleDownload(selected)} className="text-xs px-3 py-1.5 rounded border border-gray-600 text-gray-300 hover:text-white transition">{t('library.download')}</button>
-                <button onClick={() => handleDelete(selected.id)} className="text-xs px-3 py-1.5 rounded border border-red-900 text-red-400 hover:bg-red-900/30 transition">{t('library.delete')}</button>
+            <div className="p-4 border-t border-gray-800 space-y-3">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {(selected.tags ?? []).map((tag) => (
+                  <button
+                    key={tag}
+                    onClick={() => handleRemoveTag(selected, tag)}
+                    title={t('library.removeTag')}
+                    className="text-[11px] px-2 py-0.5 rounded-full bg-gray-800 border border-gray-700 text-gray-300 hover:border-red-800 hover:text-red-400 transition"
+                  >
+                    #{tag} ✕
+                  </button>
+                ))}
+                <input
+                  type="text"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleAddTag(selected); }}
+                  placeholder={t('library.addTag')}
+                  aria-label={t('library.addTag')}
+                  className="bg-gray-900 border border-gray-700 rounded-full px-3 py-0.5 text-[11px] text-white placeholder-gray-500 focus:ring-1 focus:ring-blue-500 outline-none w-28"
+                />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-gray-500 line-clamp-1" title={selected.prompt}>{selected.prompt}</p>
+                <div className="flex gap-2 shrink-0 items-center">
+                  {shareFlash && <span className="text-[11px] text-green-400">{t('library.copied')}</span>}
+                  <button onClick={() => handleShare(selected)} className="text-xs px-3 py-1.5 rounded border border-gray-600 text-gray-300 hover:text-white transition">{t('library.share')}</button>
+                  <button onClick={() => handleDownload(selected)} className="text-xs px-3 py-1.5 rounded border border-gray-600 text-gray-300 hover:text-white transition">{t('library.download')}</button>
+                  <button onClick={() => handleDelete(selected.id)} className="text-xs px-3 py-1.5 rounded border border-red-900 text-red-400 hover:bg-red-900/30 transition">{t('library.delete')}</button>
+                </div>
               </div>
             </div>
           </div>

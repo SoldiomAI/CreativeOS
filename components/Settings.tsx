@@ -132,12 +132,15 @@ const Settings: React.FC = () => {
           {/* Provider */}
           <section className={sectionCls}>
             <h3 className="text-white font-bold mb-3">{t('settings.provider')}</h3>
-            <div className="grid grid-cols-2 gap-3 max-w-sm">
+            <div className="grid grid-cols-3 gap-3 max-w-md">
               <button onClick={() => handleProvider('gemini')} className={pillCls(provider === 'gemini')}>
                 Google Gemini
               </button>
               <button onClick={() => handleProvider('openai')} className={pillCls(provider === 'openai')}>
                 OpenAI
+              </button>
+              <button onClick={() => handleProvider('pollinations')} className={pillCls(provider === 'pollinations')}>
+                {t('settings.pollinations')}
               </button>
             </div>
             <p className="text-xs text-gray-500 mt-3">{t('settings.provider.hint')}</p>
@@ -219,6 +222,15 @@ const Settings: React.FC = () => {
                 </button>
               </div>
               <p className="text-xs text-gray-500 mt-3">{t('settings.openai.hint')}</p>
+            </section>
+          )}
+
+          {/* Pollinations — free, no key */}
+          {provider === 'pollinations' && (
+            <section className={sectionCls}>
+              <h3 className="text-white font-bold mb-1">{t('settings.pollinations')}</h3>
+              <p className="text-xs font-mono mb-3 text-green-400">{t('settings.pollinations.active')}</p>
+              <p className="text-xs text-gray-500">{t('settings.pollinations.hint')}</p>
             </section>
           )}
 

@@ -99,7 +99,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
         >
           Enter System
         </button>
-        <p className="mt-4 text-xs text-gray-500">v2.2.0 • Gemini · OpenAI · ElevenLabs</p>
+        <p className="mt-4 text-xs text-gray-500">v2.2.0 • Pollinations · Gemini · OpenAI · ElevenLabs</p>
       </div>
     </div>
   );

@@ -13,7 +13,7 @@ const LS_STARTED = 'creativeos.started';
 
 export type AspectRatio = '9:16' | '16:9' | '1:1';
 export type Language = 'en' | 'ar';
-export type ProviderId = 'gemini' | 'openai';
+export type ProviderId = 'gemini' | 'openai' | 'pollinations';
 export type VoiceEngine = 'provider' | 'elevenlabs';
 
 export const getApiKey = (): string => {
@@ -40,7 +40,7 @@ export const isDemoMode = (): boolean => !getActiveProviderKey();
 export const getProviderId = (): ProviderId => {
   try {
     const v = localStorage.getItem(LS_PROVIDER);
-    if (v === 'gemini' || v === 'openai') return v;
+    if (v === 'gemini' || v === 'openai' || v === 'pollinations') return v;
   } catch { /* default below */ }
   return 'gemini';
 };
@@ -84,9 +84,13 @@ export const setOpenAiBaseUrl = (url: string): void => {
   window.dispatchEvent(new CustomEvent('creativeos:config-changed'));
 };
 
-/** Key for whichever provider is currently selected (empty string → demo mode). */
-export const getActiveProviderKey = (): string =>
-  getProviderId() === 'openai' ? getOpenAiKey() : getApiKey();
+/** Key for whichever provider is currently selected (empty string → demo mode).
+ *  Pollinations needs no key, so selecting it always counts as "live". */
+export const getActiveProviderKey = (): string => {
+  const id = getProviderId();
+  if (id === 'pollinations') return 'free';
+  return id === 'openai' ? getOpenAiKey() : getApiKey();
+};
 
 export const getVoiceEngine = (): VoiceEngine => {
   try {

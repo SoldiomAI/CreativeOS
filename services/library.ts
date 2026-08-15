@@ -13,6 +13,7 @@ export interface AssetRecord {
   data: string | Blob;
   mime: string;
   projectTopic?: string;
+  tags?: string[];
 }
 
 interface CreativeOsDB extends DBSchema {
@@ -77,6 +78,34 @@ export const deleteAsset = async (id: string): Promise<void> => {
   const db = await getDb();
   await db.delete('assets', id);
   window.dispatchEvent(new CustomEvent('creativeos:library-changed'));
+};
+
+/** Shallow-merges a patch into an existing asset (used for tag edits). */
+export const updateAsset = async (
+  id: string,
+  patch: Partial<Pick<AssetRecord, 'tags' | 'prompt' | 'projectTopic'>>
+): Promise<AssetRecord | undefined> => {
+  const db = await getDb();
+  const existing = await db.get('assets', id);
+  if (!existing) return undefined;
+  const next = { ...existing, ...patch };
+  await db.put('assets', next);
+  window.dispatchEvent(new CustomEvent('creativeos:library-changed'));
+  return next;
+};
+
+/** Case-insensitive match against prompt, type, model and tags. */
+export const matchesQuery = (asset: AssetRecord, query: string): boolean => {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const haystack = [
+    asset.prompt,
+    asset.type,
+    asset.model,
+    asset.projectTopic ?? '',
+    ...(asset.tags ?? []),
+  ].join(' ').toLowerCase();
+  return q.split(/\s+/).every((term) => haystack.includes(term));
 };
 
 /** Fetch a data: or blob: URL into a Blob for durable storage. */

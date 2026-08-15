@@ -1,0 +1,21 @@
+import { defineConfig, devices } from '@playwright/test';
+
+// Smoke suite: builds are produced by `npm run build` (webServer command below
+// runs build + preview so the suite tests the real production bundle).
+export default defineConfig({
+  testDir: './e2e',
+  timeout: 60_000,
+  retries: process.env.CI ? 1 : 0,
+  reporter: process.env.CI ? 'github' : 'list',
+  use: {
+    baseURL: 'http://127.0.0.1:4173',
+    trace: 'retain-on-failure',
+  },
+  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  webServer: {
+    command: 'npm run build && npm run preview -- --port 4173 --strictPort',
+    url: 'http://127.0.0.1:4173',
+    reuseExistingServer: !process.env.CI,
+    timeout: 180_000,
+  },
+});

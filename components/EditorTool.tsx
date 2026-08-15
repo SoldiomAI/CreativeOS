@@ -1,7 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import { ImageFile } from '../types';
 import { fileToBase64, editImage, generateImage, generateVideo } from '../services/geminiService';
-import { navigateTo, isDemoMode } from '../services/config';
+import { navigateTo } from '../services/config';
+import { getActiveProviderId } from '../services/providers';
 import { saveAsset, urlToBlob } from '../services/library';
 import Spinner from './Spinner';
 import LoadingOverlay from './LoadingOverlay';
@@ -14,7 +15,7 @@ const saveToLibrary = async (
 ) => {
   try {
     const blob = await urlToBlob(url);
-    const model = isDemoMode() ? 'demo' : type === 'video' ? 'veo' : 'imagen';
+    const model = getActiveProviderId();
     await saveAsset({ type, mime: blob.type || fallbackMime, data: blob, prompt, model });
   } catch { /* library save is best-effort */ }
 };

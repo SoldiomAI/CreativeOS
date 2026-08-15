@@ -1,7 +1,7 @@
 import { GenerationProvider } from './types';
 import { isDemoMode, getProviderId } from '../config';
 
-type LoadableId = 'gemini' | 'openai' | 'demo';
+type LoadableId = 'gemini' | 'openai' | 'pollinations' | 'demo';
 
 const cache = new Map<LoadableId, Promise<GenerationProvider>>();
 
@@ -16,6 +16,8 @@ const load = (id: LoadableId): Promise<GenerationProvider> => {
           return new (await import('./gemini')).GeminiProvider();
         case 'openai':
           return new (await import('./openai')).OpenAIProvider();
+        case 'pollinations':
+          return new (await import('./pollinations')).PollinationsProvider();
         default:
           return new (await import('./demo')).DemoProvider();
       }
@@ -31,7 +33,8 @@ const load = (id: LoadableId): Promise<GenerationProvider> => {
  */
 export const getProvider = (): Promise<GenerationProvider> => {
   if (isDemoMode()) return load('demo');
-  return load(getProviderId() === 'openai' ? 'openai' : 'gemini');
+  const id = getProviderId();
+  return load(id === 'openai' || id === 'pollinations' ? id : 'gemini');
 };
 
 /** Synchronous id of the active provider (for labels/asset metadata). */

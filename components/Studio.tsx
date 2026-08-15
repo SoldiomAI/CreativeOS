@@ -1,7 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { ImageFile, CreativeConcept, SocialCampaign } from '../types';
 import { fileToBase64, editImage, generateImage, generateVideo, generateCreativeConcepts, generateSocialMetadata } from '../services/geminiService';
-import { navigateTo, isDemoMode } from '../services/config';
+import { navigateTo } from '../services/config';
+import { getActiveProviderId } from '../services/providers';
 import { saveAsset, urlToBlob, listAssets, AssetRecord } from '../services/library';
 import { useI18n } from '../i18n';
 import Spinner from './Spinner';
@@ -157,7 +158,7 @@ const Studio: React.FC<StudioProps> = ({ onBack }) => {
         setStep(2);
         try {
             const blob = await urlToBlob(url);
-            await saveAsset({ type: 'video', mime: blob.type || 'video/mp4', data: blob, prompt: visualPrompt, model: isDemoMode() ? 'demo' : 'veo' });
+            await saveAsset({ type: 'video', mime: blob.type || 'video/mp4', data: blob, prompt: visualPrompt, model: getActiveProviderId() });
         } catch { /* library save is best-effort */ }
     } catch (e: any) {
         if (e.message === 'API_KEY_REQUIRED') {
@@ -192,7 +193,7 @@ const Studio: React.FC<StudioProps> = ({ onBack }) => {
             const kit = (['youtube', 'instagram', 'tiktok'] as const)
               .map((p) => `## ${p.toUpperCase()}\n${campaign[p].caption}\n${campaign[p].hashtags.join(' ')}`)
               .join('\n\n');
-            await saveAsset({ type: 'text', mime: 'text/plain', data: kit, prompt: `Social kit: ${topic}`, model: isDemoMode() ? 'demo' : 'gemini', projectTopic: topic });
+            await saveAsset({ type: 'text', mime: 'text/plain', data: kit, prompt: `Social kit: ${topic}`, model: getActiveProviderId(), projectTopic: topic });
         } catch { /* library save is best-effort */ }
      } catch (e) {
         console.error(e);
